@@ -2,6 +2,8 @@
 
 A reinforcement learning agent that learns to play Super Mario Bros using **Proximal Policy Optimization (PPO)**. This is a reimplementation of my previous DQN-based Mario agent, now using PPO for improved stability and sample efficiency.
 
+<img width="1536" height="274" alt="banner" src="https://github.com/user-attachments/assets/aad95dcd-9c26-41b3-8287-d334a0bab3ec" />
+
 ## Why PPO over DQN?
 
 | Aspect | DQN | PPO |
