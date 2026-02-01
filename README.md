@@ -215,6 +215,26 @@ Signs of policy collapse:
 - Low action entropy (< 0.5)
 - Mario not making progress (low x_pos)
 
+### Automatic Collapse Detection & Recovery
+
+Training now includes a **PolicyCollapseCallback** that automatically monitors for policy collapse and rolls back to a healthy checkpoint when detected.
+
+**Detection triggers:**
+- Dominant action > 85% of all actions
+- Entropy drops below 0.3
+
+**How it works:**
+1. Every 50K steps, the callback samples the policy's action distribution
+2. If collapse is detected, it automatically loads the last healthy checkpoint
+3. Training continues from the healthy checkpoint with full context preserved
+
+**TensorBoard metrics:**
+- `policy_health/dominant_action` - Most frequently chosen action
+- `policy_health/dominant_ratio` - % of times the dominant action is chosen  
+- `policy_health/entropy` - Action distribution entropy
+- `policy_health/collapse_count` - Number of collapses detected
+- `policy_health/recovery_count` - Number of successful recoveries
+
 ### High RAM Usage
 
 Each parallel environment runs a full NES emulator. Reduce `--n-envs` if you run out of memory.

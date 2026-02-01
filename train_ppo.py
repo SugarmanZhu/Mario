@@ -10,43 +10,8 @@ import os
 import time
 from datetime import datetime
 
-
-def linear_schedule(initial_value: float):
-    """
-    Linear learning rate schedule.
-    Returns a function that computes current learning rate based on remaining progress.
-    """
-    def func(progress_remaining: float) -> float:
-        return progress_remaining * initial_value
-    return func
-
-
-def make_env(env_id, render_mode=None, use_reward_shaping=True):
-    """
-    Create a single preprocessed environment.
-    Used for vectorized environments.
-    
-    Args:
-        env_id: Environment ID
-        rank: Environment index (unused, for compatibility)
-        render_mode: Render mode (None for training)
-        use_reward_shaping: Apply custom reward shaping to prevent policy collapse
-    """
-    def _init():
-        from wrappers import make_mario_env
-        env = make_mario_env(
-            env_id=env_id,
-            actions='simple',  # 7 actions
-            skip_frames=4,
-            resize_shape=84,
-            grayscale=True,
-            normalize=True,
-            stack_frames=4,
-            render_mode=render_mode,  # Always None for training
-            use_reward_shaping=use_reward_shaping
-        )
-        return env
-    return _init
+from callbacks import PolicyCollapseCallback
+from utils import linear_schedule, make_env
 
 
 def train(
@@ -186,13 +151,27 @@ def train(
         render=False
     )
     
-    callbacks = CallbackList([checkpoint_callback, eval_callback])
+    # Policy collapse detection and auto-recovery callback
+    collapse_callback = PolicyCollapseCallback(
+        check_freq=50_000,  # Check every 50k steps
+        dominant_action_threshold=0.85,  # Trigger if any action > 85%
+        entropy_threshold=0.3,  # Trigger if entropy < 0.3
+        checkpoint_dir=save_dir,
+        checkpoint_prefix=run_name,
+        n_eval_samples=50,  # Sample 50 batches of observations
+        verbose=1
+    )
+    
+    callbacks = CallbackList([checkpoint_callback, eval_callback, collapse_callback])
     
     # Train!
     print("\n" + "=" * 60)
     print("Starting training...")
     print("=" * 60)
     print(f"Tensorboard: tensorboard --logdir {log_dir}")
+    print("Policy collapse detection: ENABLED")
+    print("  - Auto-rollback if dominant action > 85%")
+    print("  - Auto-rollback if entropy < 0.3")
     print("=" * 60 + "\n")
     
     start_time = time.time()
