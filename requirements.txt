@@ -1,0 +1,27 @@
+# Mario RL Agent Requirements
+# Note: gym version is critical for compatibility with gym-super-mario-bros
+
+# Core gym - using 0.26.2 for compatibility with gym-super-mario-bros
+# The apply_api_compatibility=True flag bridges old/new API
+gym==0.26.2
+
+# Super Mario Bros environment
+gym-super-mario-bros==7.4.0
+
+# NES emulator (dependency of gym-super-mario-bros)
+nes-py>=8.2.1
+
+# Stable-Baselines3 for PPO algorithm
+stable-baselines3[extra]>=2.0.0
+
+# PyTorch (install separately if needed for GPU support)
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+
+# Tensorboard for training visualization
+tensorboard>=2.10.0
+
+# OpenCV for image preprocessing
+opencv-python>=4.6.0
+
+# NumPy (must be <2.0 for gym compatibility)
+numpy>=1.21.0,<2.0
