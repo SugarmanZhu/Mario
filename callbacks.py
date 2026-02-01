@@ -92,31 +92,32 @@ class PolicyCollapseCallback(BaseCallback):
     
     def _collect_action_counts(self) -> dict:
         """
-        Collect action counts by running the policy on sampled observations.
+        Collect action counts by sampling from the policy's action distribution.
+        
+        NOTE: We do NOT interact with the training environment here to avoid
+        disrupting SubprocVecEnv and causing deadlocks. Instead, we sample
+        random observations and query the policy.
         
         Returns:
             dict mapping action -> count
         """
-        obs = self.training_env.reset()
         action_counts = {}
+        n_envs = self.training_env.num_envs
+        obs_shape = self.training_env.observation_space.shape
         
+        # Generate random observations (normalized pixel values)
+        # This tests if the policy has collapsed to always choosing one action
         for _ in range(self.n_eval_samples):
-            # Get action from policy (deterministic=False to see the distribution)
-            action, _ = self.model.predict(obs, deterministic=False)
+            # Create random observations (batch of n_envs observations)
+            random_obs = np.random.rand(n_envs, *obs_shape).astype(np.float32)
             
-            # Count actions across all environments
+            # Get action from policy
+            action, _ = self.model.predict(random_obs, deterministic=False)
+            
+            # Count actions
             for a in action:
                 a = int(a)
                 action_counts[a] = action_counts.get(a, 0) + 1
-            
-            # Take a random action to get variety in observations
-            random_action = np.array([self.training_env.action_space.sample() 
-                                      for _ in range(self.training_env.num_envs)])
-            obs, _, dones, _ = self.training_env.step(random_action)
-            
-            # Reset any done environments
-            if np.any(dones):
-                obs = self.training_env.reset()
         
         return action_counts
     
