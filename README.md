@@ -18,6 +18,7 @@ A reinforcement learning agent that learns to play Super Mario Bros using **Prox
 - **Best Model Tracking**: Automatically saves the best performing model based on evaluation
 - **TensorBoard Integration**: Real-time training visualization
 - **Custom Preprocessing Pipeline**: Optimized observation wrappers for efficient learning
+- **Custom Reward Shaping**: Prevents policy collapse and encourages diverse behavior
 
 ## Hardware Used
 
@@ -62,6 +63,7 @@ pip install -r requirements.txt
 Mario/
 ├── train_ppo.py        # Main training and inference script
 ├── wrappers.py         # Custom environment wrappers
+├── diagnose_policy.py  # Tool to analyze policy health and detect collapse
 ├── requirements.txt    # Python dependencies
 ├── mario_models/       # Saved model checkpoints
 │   └── best/           # Best model based on evaluation
@@ -79,14 +81,31 @@ python train_ppo.py --mode train --timesteps 10000000 --n-envs 16
 
 Resume from a checkpoint:
 ```bash
-python train_ppo.py --mode train --timesteps 10000000 --n-envs 48 --resume ./mario_models/mario_ppo_XXXXXXXX_XXXXXX_XXXXXXX_steps.zip
+python train_ppo.py --mode train --resume ./mario_models/best/best_model.zip --timesteps 2000000
 ```
 
 ### Playing/Testing
 
 Watch the trained agent play:
 ```bash
-python train_ppo.py --mode play --model ./mario_models/best/best_model.zip
+python train_ppo.py --mode play --model ./mario_models/best/best_model
+```
+
+Watch in slow motion (easier for humans to follow):
+```bash
+python train_ppo.py --mode play --model ./mario_models/best/best_model --slow
+```
+
+### Diagnosing Policy Health
+
+Check if a model has policy collapse:
+```bash
+python diagnose_policy.py --model ./mario_models/best/best_model.zip
+```
+
+Find the last healthy checkpoint:
+```bash
+python diagnose_policy.py --find-healthy
 ```
 
 ### Monitoring Training
@@ -109,6 +128,21 @@ Then open http://localhost:6006 in your browser.
 | `--model` | `None` | Model path for play mode |
 | `--resume` | `None` | Checkpoint path to resume training |
 | `--lr` | `0.0001` | Learning rate |
+| `--slow` | `False` | Slow down playback for human viewing |
+
+## Custom Reward Shaping
+
+The `CustomRewardWrapper` adds reward shaping to prevent policy collapse and encourage good behavior:
+
+| Reward | Value | Description |
+|--------|-------|-------------|
+| Forward progress | `+0.1 × Δx` | Reward for moving right |
+| Stuck penalty | `-0.5` | After 10+ frames without moving |
+| Time penalty | `-0.01` | Per step (encourages speed) |
+| Flag bonus | `+100` | Reaching the flagpole |
+| Death penalty | `-50` | Dying without reaching flag |
+| Score reward | `+0.01 × Δscore` | Killing enemies, power-ups |
+| Coin bonus | `+5.0` per coin | Collecting coins |
 
 ## Preprocessing Pipeline
 
@@ -132,7 +166,7 @@ n_epochs = 10           # Epochs per update
 gamma = 0.99            # Discount factor
 gae_lambda = 0.95       # GAE lambda for advantage estimation
 clip_range = 0.2        # PPO clipping parameter
-ent_coef = 0.01         # Entropy coefficient (encourages exploration)
+ent_coef = 0.05         # Entropy coefficient (prevents policy collapse)
 vf_coef = 0.5           # Value function coefficient
 max_grad_norm = 0.5     # Gradient clipping
 learning_rate = 1e-4    # With linear decay schedule
@@ -163,6 +197,25 @@ Typical learning milestones (may vary):
 | 2M-5M | Learns to jump over pipes and gaps |
 | 5M-10M | Can complete level 1-1 occasionally |
 | 10M+ | Consistent level completion |
+
+## Troubleshooting
+
+### Policy Collapse
+
+If Mario stops moving or always takes the same action:
+
+1. **Diagnose**: Run `python diagnose_policy.py --model YOUR_MODEL`
+2. **Find healthy checkpoint**: Run `python diagnose_policy.py --find-healthy`
+3. **Resume from healthy checkpoint**: `python train_ppo.py --mode train --resume HEALTHY_CHECKPOINT`
+
+Signs of policy collapse:
+- Dominant action > 80%
+- Low action entropy (< 0.5)
+- Mario not making progress (low x_pos)
+
+### High RAM Usage
+
+Each parallel environment runs a full NES emulator. Reduce `--n-envs` if you run out of memory.
 
 ## Resource Usage
 
