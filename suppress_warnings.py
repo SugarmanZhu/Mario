@@ -11,7 +11,17 @@ class _SuppressGymWarning:
         self.stream = stream
     
     def write(self, msg):
-        if 'Gym has been unmaintained' not in msg and 'np.bool8' not in msg:
+        # Skip empty or whitespace-only messages
+        if not msg or msg.isspace():
+            return
+        # Skip known warning patterns
+        suppress = [
+            'Gym has been unmaintained',
+            'bool8',
+            'DeprecationWarning',
+            'UserWarning',
+        ]
+        if not any(s in msg for s in suppress):
             self.stream.write(msg)
     
     def flush(self):
