@@ -42,6 +42,11 @@ def make_env(env_id, render_mode=None):
     """
     Create a single preprocessed environment.
     Used for vectorized environments.
+    
+    Args:
+        env_id: Environment ID
+        rank: Environment index (unused, for compatibility)
+        render_mode: Render mode (None for training)
     """
     def _init():
         from wrappers import make_mario_env
@@ -53,7 +58,7 @@ def make_env(env_id, render_mode=None):
             grayscale=True,
             normalize=True,
             stack_frames=4,
-            render_mode=render_mode
+            render_mode=render_mode  # Always None for training
         )
         return env
     return _init
@@ -118,18 +123,18 @@ def train(
     try:
         # Use SubprocVecEnv for true parallelism (better for multiple envs)
         if n_envs > 1:
-            train_env = SubprocVecEnv([make_env(env_id, i) for i in range(n_envs)])
+            train_env = SubprocVecEnv([make_env(env_id) for i in range(n_envs)])
         else:
-            train_env = DummyVecEnv([make_env(env_id, 0)])
+            train_env = DummyVecEnv([make_env(env_id)])
         print(f"Training env observation space: {train_env.observation_space}")
         print(f"Training env action space: {train_env.action_space}")
     except Exception as e:
         print(f"SubprocVecEnv failed, falling back to DummyVecEnv: {e}")
-        train_env = DummyVecEnv([make_env(env_id, i) for i in range(n_envs)])
+        train_env = DummyVecEnv([make_env(env_id) for i in range(n_envs)])
     
     # Create evaluation environment
     print("Creating evaluation environment...")
-    eval_env = DummyVecEnv([make_env(env_id, 0)])
+    eval_env = DummyVecEnv([make_env(env_id)])
     
     # Setup learning rate
     lr = linear_schedule(learning_rate) if use_lr_schedule else learning_rate
