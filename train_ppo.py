@@ -230,7 +230,7 @@ def train(
     return model
 
 
-def play(model_path, env_id='SuperMarioBros-1-1-v0', episodes=5, render=True):
+def play(model_path, env_id='SuperMarioBros-1-1-v0', episodes=5, render=True, slow=False):
     """
     Play using a trained model.
     
@@ -239,6 +239,7 @@ def play(model_path, env_id='SuperMarioBros-1-1-v0', episodes=5, render=True):
         env_id: Environment ID
         episodes: Number of episodes to play
         render: Whether to render the game
+        slow: Slow down playback for human viewing
     """
     from stable_baselines3 import PPO
     from wrappers import make_mario_env
@@ -259,6 +260,9 @@ def play(model_path, env_id='SuperMarioBros-1-1-v0', episodes=5, render=True):
         use_reward_shaping=False  # Don't need reward shaping for play mode
     )
     
+    # Delay between steps for slow mode (in seconds)
+    step_delay = 0.05 if slow else 0  # 50ms delay = ~20 FPS
+    
     for episode in range(episodes):
         obs, info = env.reset()
         done = False
@@ -272,6 +276,10 @@ def play(model_path, env_id='SuperMarioBros-1-1-v0', episodes=5, render=True):
             obs, reward, done, truncated, info = env.step(action)
             total_reward += reward
             steps += 1
+            
+            # Slow down for human viewing
+            if step_delay > 0:
+                time.sleep(step_delay)
             
             if done or truncated:
                 break
@@ -302,6 +310,8 @@ if __name__ == "__main__":
                         help='Path to checkpoint to resume training from')
     parser.add_argument('--lr', type=float, default=1e-4,
                         help='Learning rate')
+    parser.add_argument('--slow', action='store_true',
+                        help='Slow down playback for human viewing (play mode only)')
     
     args = parser.parse_args()
     
@@ -317,4 +327,4 @@ if __name__ == "__main__":
         if args.model is None:
             print("Error: --model required for play mode")
             exit(1)
-        play(model_path=args.model, env_id=args.env)
+        play(model_path=args.model, env_id=args.env, slow=args.slow)
