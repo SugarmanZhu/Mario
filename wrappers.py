@@ -121,13 +121,7 @@ class FrameStack(gym.Wrapper):
         return stacked, info
 
     def step(self, action):
-        result = self.env.step(action)
-        
-        if len(result) == 5:
-            obs, reward, done, truncated, info = result
-        else:
-            obs, reward, done, info = result
-            truncated = False
+        obs, reward, done, truncated, info = self.env.step(action)
         
         # Update frame stack
         self.frames.pop(0)
@@ -156,6 +150,89 @@ class TransposeObservation(gym.ObservationWrapper):
         return observation.transpose(2, 0, 1)
 
 
+class CustomRewardWrapper(gym.Wrapper):
+    """
+    Custom reward shaping to prevent policy collapse.
+    
+    Key changes:
+    1. Reward forward progress (x_pos increase)
+    2. Penalize standing still / moving backward
+    3. Bonus for reaching flag
+    4. Time pressure to prevent standing still
+    """
+    def __init__(self, env, forward_reward_scale=0.1, death_penalty=-50, 
+                 stuck_penalty=-0.5, flag_bonus=100, time_penalty=-0.01):
+        super().__init__(env)
+        self._prev_x_pos = 0
+        self._prev_time = 400
+        self._stuck_counter = 0
+        
+        # Reward shaping parameters
+        self.forward_reward_scale = forward_reward_scale
+        self.death_penalty = death_penalty
+        self.stuck_penalty = stuck_penalty
+        self.flag_bonus = flag_bonus
+        self.time_penalty = time_penalty
+        
+    def reset(self, **kwargs):
+        result = self.env.reset(**kwargs)
+        if isinstance(result, tuple):
+            obs, info = result
+        else:
+            obs = result
+            info = {}
+        
+        self._prev_x_pos = info.get('x_pos', 0)
+        self._prev_time = info.get('time', 400)
+        self._stuck_counter = 0
+        return obs, info
+    
+    def step(self, action):
+        obs, reward, done, truncated, info = self.env.step(action)
+        
+        # Get current state
+        x_pos = info.get('x_pos', 0)
+        time_left = info.get('time', 400)
+        flag_get = info.get('flag_get', False)
+        
+        # Calculate shaped reward
+        shaped_reward = 0
+        
+        # 1. Forward progress reward (most important!)
+        x_delta = x_pos - self._prev_x_pos
+        shaped_reward += x_delta * self.forward_reward_scale
+        
+        # 2. Stuck penalty - if Mario hasn't moved in a while
+        if x_delta <= 0:
+            self._stuck_counter += 1
+            if self._stuck_counter > 10:  # Stuck for 10+ frames
+                shaped_reward += self.stuck_penalty
+        else:
+            self._stuck_counter = 0
+        
+        # 3. Time pressure - small penalty for time passing
+        shaped_reward += self.time_penalty
+        
+        # 4. Flag bonus
+        if flag_get:
+            shaped_reward += self.flag_bonus
+        
+        # 5. Death penalty (when Mario dies, x_pos typically doesn't reset but done=True)
+        if done and not flag_get:
+            # Check if this was a death (not timeout)
+            shaped_reward += self.death_penalty
+        
+        # Combine original reward with shaped reward
+        # Original reward from Mario is small (-15 to +15), so add our shaping
+        total_reward = reward + shaped_reward
+        
+        # Update state
+        self._prev_x_pos = x_pos
+        self._prev_time = time_left
+        
+        return obs, total_reward, done, truncated, info
+
+
 def make_mario_env(
     env_id='SuperMarioBros-v0',
     actions='simple',
@@ -164,7 +241,8 @@ def make_mario_env(
     grayscale=True,
     normalize=True,
     stack_frames=4,
-    render_mode=None
+    render_mode=None,
+    use_reward_shaping=True
 ):
     """
     Create a preprocessed Super Mario Bros environment.
@@ -178,6 +256,7 @@ def make_mario_env(
         normalize: Normalize pixel values to [0, 1]
         stack_frames: Number of frames to stack
         render_mode: 'human' for visual rendering, 'rgb_array' for array, None for no render
+        use_reward_shaping: Apply custom reward shaping to prevent policy collapse
     
     Returns:
         Preprocessed environment
@@ -194,7 +273,7 @@ def make_mario_env(
     }
     action_space = action_map.get(actions, SIMPLE_MOVEMENT)
     
-    # Create base environment with compatibility mode
+    # Create base environment with compatibility mode for new gym API
     env = gym.make(
         env_id,
         apply_api_compatibility=True,
@@ -203,6 +282,10 @@ def make_mario_env(
     
     # Apply JoypadSpace to reduce action space
     env = JoypadSpace(env, action_space)
+    
+    # Apply custom reward shaping BEFORE other wrappers (needs access to info dict)
+    if use_reward_shaping:
+        env = CustomRewardWrapper(env)
     
     # Apply preprocessing wrappers
     if skip_frames > 1:

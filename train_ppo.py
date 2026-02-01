@@ -21,7 +21,7 @@ def linear_schedule(initial_value: float):
     return func
 
 
-def make_env(env_id, render_mode=None):
+def make_env(env_id, render_mode=None, use_reward_shaping=True):
     """
     Create a single preprocessed environment.
     Used for vectorized environments.
@@ -30,6 +30,7 @@ def make_env(env_id, render_mode=None):
         env_id: Environment ID
         rank: Environment index (unused, for compatibility)
         render_mode: Render mode (None for training)
+        use_reward_shaping: Apply custom reward shaping to prevent policy collapse
     """
     def _init():
         from wrappers import make_mario_env
@@ -41,7 +42,8 @@ def make_env(env_id, render_mode=None):
             grayscale=True,
             normalize=True,
             stack_frames=4,
-            render_mode=render_mode  # Always None for training
+            render_mode=render_mode,  # Always None for training
+            use_reward_shaping=use_reward_shaping
         )
         return env
     return _init
@@ -131,9 +133,11 @@ def train(
             tensorboard_log=log_dir,
             device='auto'
         )
-        # Update learning rate if needed
+        # Update hyperparameters for resumed training
         model.learning_rate = lr
+        model.ent_coef = 0.05  # Higher entropy to recover from policy collapse
         print(f"Resumed! Previous timesteps: {model.num_timesteps:,}")
+        print(f"Updated ent_coef to {model.ent_coef}")
     else:
         print("\nCreating new PPO model...")
         # Policy kwargs to handle normalized images
@@ -151,7 +155,7 @@ def train(
             gae_lambda=0.95,           # GAE lambda
             clip_range=0.2,            # PPO clip range
             clip_range_vf=None,        # Value function clip (None = no clipping)
-            ent_coef=0.01,             # Entropy coefficient (exploration)
+            ent_coef=0.05,             # HIGHER entropy to prevent policy collapse
             vf_coef=0.5,               # Value function coefficient
             max_grad_norm=0.5,         # Gradient clipping
             verbose=1,
@@ -251,7 +255,8 @@ def play(model_path, env_id='SuperMarioBros-1-1-v0', episodes=5, render=True):
         grayscale=True,
         normalize=True,
         stack_frames=4,
-        render_mode=render_mode
+        render_mode=render_mode,
+        use_reward_shaping=False  # Don't need reward shaping for play mode
     )
     
     for episode in range(episodes):
