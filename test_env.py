@@ -2,25 +2,7 @@
 Test script to verify the Super Mario Bros environment works correctly.
 This tests the compatibility layer between old gym and new gymnasium API.
 """
-# Suppress ALL gym warnings before import
-import warnings
-import sys
-
-# Suppress the gym deprecation message (it prints to stderr)
-class SuppressGymWarning:
-    def __init__(self, stream):
-        self.stream = stream
-    def write(self, msg):
-        if 'Gym has been unmaintained' not in msg and 'np.bool8' not in msg:
-            self.stream.write(msg)
-    def flush(self):
-        self.stream.flush()
-
-sys.stderr = SuppressGymWarning(sys.stderr)
-
-warnings.filterwarnings('ignore', category=UserWarning)
-warnings.filterwarnings('ignore', category=DeprecationWarning)
-
+import suppress_warnings  # noqa: F401 - must be first to suppress gym warnings
 import time
 
 

@@ -2,22 +2,7 @@
 Custom wrappers for Super Mario Bros environment.
 These handle preprocessing for RL training with PPO.
 """
-# Suppress gym warnings
-import warnings
-import sys
-
-class _SuppressGymWarning:
-    def __init__(self, stream):
-        self.stream = stream
-    def write(self, msg):
-        if 'Gym has been unmaintained' not in msg and 'np.bool8' not in msg:
-            self.stream.write(msg)
-    def flush(self):
-        self.stream.flush()
-
-sys.stderr = _SuppressGymWarning(sys.stderr)
-warnings.filterwarnings('ignore', category=UserWarning)
-warnings.filterwarnings('ignore', category=DeprecationWarning)
+import suppress_warnings  # noqa: F401 - must be first to suppress gym warnings
 
 import gym
 import numpy as np

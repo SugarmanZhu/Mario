@@ -4,28 +4,11 @@ Train a PPO agent to play Super Mario Bros.
 This script uses Stable-Baselines3 PPO with proven hyperparameters
 from successful Mario implementations.
 """
-# Suppress gym warnings
-import warnings
-import sys
-
-class _SuppressGymWarning:
-    def __init__(self, stream):
-        self.stream = stream
-    def write(self, msg):
-        if 'Gym has been unmaintained' not in msg and 'np.bool8' not in msg:
-            self.stream.write(msg)
-    def flush(self):
-        self.stream.flush()
-
-sys.stderr = _SuppressGymWarning(sys.stderr)
-warnings.filterwarnings('ignore', category=UserWarning)
-warnings.filterwarnings('ignore', category=DeprecationWarning)
+import suppress_warnings  # noqa: F401 - must be first to suppress gym warnings
 
 import os
 import time
 from datetime import datetime
-
-import numpy as np
 
 
 def linear_schedule(initial_value: float):
