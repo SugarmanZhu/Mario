@@ -159,12 +159,16 @@ class CustomRewardWrapper(gym.Wrapper):
     2. Penalize standing still / moving backward
     3. Bonus for reaching flag
     4. Time pressure to prevent standing still
+    5. Score increase reward (coins, enemies, etc.)
     """
     def __init__(self, env, forward_reward_scale=0.1, death_penalty=-50, 
-                 stuck_penalty=-0.5, flag_bonus=100, time_penalty=-0.01):
+                 stuck_penalty=-0.5, flag_bonus=100, time_penalty=-0.01,
+                 score_reward_scale=0.01, coin_bonus=5.0):
         super().__init__(env)
         self._prev_x_pos = 0
         self._prev_time = 400
+        self._prev_score = 0
+        self._prev_coins = 0
         self._stuck_counter = 0
         
         # Reward shaping parameters
@@ -173,6 +177,8 @@ class CustomRewardWrapper(gym.Wrapper):
         self.stuck_penalty = stuck_penalty
         self.flag_bonus = flag_bonus
         self.time_penalty = time_penalty
+        self.score_reward_scale = score_reward_scale
+        self.coin_bonus = coin_bonus
         
     def reset(self, **kwargs):
         result = self.env.reset(**kwargs)
@@ -184,6 +190,8 @@ class CustomRewardWrapper(gym.Wrapper):
         
         self._prev_x_pos = info.get('x_pos', 0)
         self._prev_time = info.get('time', 400)
+        self._prev_score = info.get('score', 0)
+        self._prev_coins = info.get('coins', 0)
         self._stuck_counter = 0
         return obs, info
     
@@ -194,6 +202,8 @@ class CustomRewardWrapper(gym.Wrapper):
         x_pos = info.get('x_pos', 0)
         time_left = info.get('time', 400)
         flag_get = info.get('flag_get', False)
+        score = info.get('score', 0)
+        coins = info.get('coins', 0)
         
         # Calculate shaped reward
         shaped_reward = 0
@@ -217,18 +227,28 @@ class CustomRewardWrapper(gym.Wrapper):
         if flag_get:
             shaped_reward += self.flag_bonus
         
-        # 5. Death penalty (when Mario dies, x_pos typically doesn't reset but done=True)
+        # 5. Death penalty
         if done and not flag_get:
-            # Check if this was a death (not timeout)
             shaped_reward += self.death_penalty
         
+        # 6. Score increase reward (killing enemies, collecting power-ups, etc.)
+        score_delta = score - self._prev_score
+        if score_delta > 0:
+            shaped_reward += score_delta * self.score_reward_scale
+        
+        # 7. Coin bonus
+        coin_delta = coins - self._prev_coins
+        if coin_delta > 0:
+            shaped_reward += coin_delta * self.coin_bonus
+        
         # Combine original reward with shaped reward
-        # Original reward from Mario is small (-15 to +15), so add our shaping
         total_reward = reward + shaped_reward
         
         # Update state
         self._prev_x_pos = x_pos
         self._prev_time = time_left
+        self._prev_score = score
+        self._prev_coins = coins
         
         return obs, total_reward, done, truncated, info
 
