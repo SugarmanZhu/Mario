@@ -18,13 +18,67 @@
 
 A reinforcement learning agent that learns to play Super Mario Bros using **Proximal Policy Optimization (PPO)**. This is a reimplementation of my previous DQN-based Mario agent, now using PPO for improved stability and sample efficiency.
 
+## Version Compatibility
+
+> [!WARNING]
+> **Breaking Change in v2.0.0**
+>
+> | Version | Action Space | Actions | Compatible Models |
+> |---------|--------------|---------|-------------------|
+> | v1.x | SIMPLE_MOVEMENT | 7 | v1.x only |
+> | v2.x | COMPLEX_MOVEMENT | 12 | v2.x only |
+>
+> **v1.x and v2.x models are NOT compatible** due to different action space sizes.
+>
+> v2.0 adds `down` (enter pipes), `up` (climb vines), and full left movement actions.
+
 ## Trained Models
 
-| Level | Model | Training Steps | Result |
-|-------|-------|---------------|--------|
-| 1-1 | [Download](https://github.com/SugarmanZhu/Mario/releases/download/v1.0.0/1-1-v0.zip) | ~12.5M | Completes level |
+| Level | Version | Model | Training Steps | Result |
+|-------|---------|-------|---------------|--------|
+| 1-1 | v1.0.0 | [Download](https://github.com/SugarmanZhu/Mario/releases/download/v1.0.0/1-1-v0.zip) | ~12.5M | Completes level |
+| 1-2 | v1.1.0 | [Download](https://github.com/SugarmanZhu/Mario/releases/download/v1.1.0/1-2-v0.zip) | ~9.7M | Reaches warp zone |
 
-> Models trained with code version `v1.0.0`. See [Releases](https://github.com/SugarmanZhu/Mario/releases) for pre-trained models.
+> [!NOTE]
+> v1.x models require [v1.1.0](https://github.com/SugarmanZhu/Mario/releases/tag/v1.1.0) or earlier code.
+> See [Releases](https://github.com/SugarmanZhu/Mario/releases) for all pre-trained models.
+
+## Action Space
+
+<details>
+<summary><b>v2.x - COMPLEX_MOVEMENT (12 actions)</b> - Current</summary>
+
+| # | Action | Description |
+|---|--------|-------------|
+| 0 | `NOOP` | Do nothing |
+| 1 | `right` | Walk right |
+| 2 | `right + A` | Jump right |
+| 3 | `right + B` | Run right |
+| 4 | `right + A + B` | Sprint jump right |
+| 5 | `A` | Jump in place |
+| 6 | `left` | Walk left |
+| 7 | `left + A` | Jump left |
+| 8 | `left + B` | Run left |
+| 9 | `left + A + B` | Sprint jump left |
+| 10 | `down` | Crouch / Enter pipe |
+| 11 | `up` | Climb vine / Enter door |
+
+</details>
+
+<details>
+<summary><b>v1.x - SIMPLE_MOVEMENT (7 actions)</b> - Legacy</summary>
+
+| # | Action | Description |
+|---|--------|-------------|
+| 0 | `NOOP` | Do nothing |
+| 1 | `right` | Walk right |
+| 2 | `right + A` | Jump right |
+| 3 | `right + B` | Run right |
+| 4 | `right + A + B` | Sprint jump right |
+| 5 | `A` | Jump in place |
+| 6 | `left` | Walk left |
+
+</details>
 
 ## Why PPO over DQN?
 

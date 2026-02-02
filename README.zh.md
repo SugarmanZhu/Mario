@@ -18,13 +18,67 @@
 
 一个使用 **近端策略优化 (PPO)** 学习玩超级马里奥兄弟的强化学习智能体。这是我之前基于DQN的马里奥智能体的重新实现，现在使用PPO以获得更好的稳定性和样本效率。
 
+## 版本兼容性
+
+> [!WARNING]
+> **v2.0.0 破坏性更新**
+>
+> | 版本 | 动作空间 | 动作数 | 兼容模型 |
+> |------|---------|--------|----------|
+> | v1.x | SIMPLE_MOVEMENT | 7 | 仅v1.x |
+> | v2.x | COMPLEX_MOVEMENT | 12 | 仅v2.x |
+>
+> **v1.x 和 v2.x 的模型不兼容**，因为动作空间大小不同。
+>
+> v2.0 新增了 `down`（进入水管）、`up`（爬藤蔓）以及完整的向左移动动作。
+
 ## 训练好的模型
 
-| 关卡 | 模型 | 训练步数 | 结果 |
-|------|------|---------|------|
-| 1-1 | [下载](https://github.com/SugarmanZhu/Mario/releases/download/v1.0.0/1-1-v0.zip) | ~1250万 | 通关 |
+| 关卡 | 版本 | 模型 | 训练步数 | 结果 |
+|------|------|------|---------|------|
+| 1-1 | v1.0.0 | [下载](https://github.com/SugarmanZhu/Mario/releases/download/v1.0.0/1-1-v0.zip) | ~1250万 | 通关 |
+| 1-2 | v1.1.0 | [下载](https://github.com/SugarmanZhu/Mario/releases/download/v1.1.0/1-2-v0.zip) | ~970万 | 到达传送门 |
 
-> 模型使用代码版本 `v1.0.0` 训练。预训练模型请查看 [Releases](https://github.com/SugarmanZhu/Mario/releases)。
+> [!NOTE]
+> v1.x 模型需要 [v1.1.0](https://github.com/SugarmanZhu/Mario/releases/tag/v1.1.0) 或更早版本的代码。
+> 预训练模型请查看 [Releases](https://github.com/SugarmanZhu/Mario/releases)。
+
+## 动作空间
+
+<details>
+<summary><b>v2.x - COMPLEX_MOVEMENT (12个动作)</b> - 当前版本</summary>
+
+| # | 动作 | 描述 |
+|---|------|------|
+| 0 | `NOOP` | 不动 |
+| 1 | `right` | 向右走 |
+| 2 | `right + A` | 向右跳 |
+| 3 | `right + B` | 向右跑 |
+| 4 | `right + A + B` | 向右冲刺跳 |
+| 5 | `A` | 原地跳 |
+| 6 | `left` | 向左走 |
+| 7 | `left + A` | 向左跳 |
+| 8 | `left + B` | 向左跑 |
+| 9 | `left + A + B` | 向左冲刺跳 |
+| 10 | `down` | 蹲下 / 进入水管 |
+| 11 | `up` | 爬藤蔓 / 进入门 |
+
+</details>
+
+<details>
+<summary><b>v1.x - SIMPLE_MOVEMENT (7个动作)</b> - 旧版本</summary>
+
+| # | 动作 | 描述 |
+|---|------|------|
+| 0 | `NOOP` | 不动 |
+| 1 | `right` | 向右走 |
+| 2 | `right + A` | 向右跳 |
+| 3 | `right + B` | 向右跑 |
+| 4 | `right + A + B` | 向右冲刺跳 |
+| 5 | `A` | 原地跳 |
+| 6 | `left` | 向左走 |
+
+</details>
 
 ## 为什么选择PPO而不是DQN？
 
