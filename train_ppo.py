@@ -12,18 +12,7 @@ import time
 from datetime import datetime
 
 from callbacks import PolicyCollapseCallback
-from utils import linear_schedule, make_env
-
-
-def get_level_from_env_id(env_id: str) -> str:
-    """Extract level name from env_id (e.g., 'SuperMarioBros-1-1-v0' -> '1-1')."""
-    import re
-
-    match = re.search(r"(\d+-\d+)", env_id)
-    if match:
-        return match.group(1)
-    # For random stages or other envs, use a sanitized name
-    return env_id.replace("SuperMarioBros", "").replace("-v0", "").strip("-") or "misc"
+from utils import linear_schedule, make_env, get_level_from_env_id, play
 
 
 def train(
@@ -232,72 +221,6 @@ def train(
     eval_env.close()
 
     return model
-
-
-def play(
-    model_path, env_id="SuperMarioBros-1-1-v0", episodes=5, render=True, slow=False
-):
-    """
-    Play using a trained model.
-
-    Args:
-        model_path: Path to saved model
-        env_id: Environment ID
-        episodes: Number of episodes to play
-        render: Whether to render the game
-        slow: Slow down playback for human viewing
-    """
-    from stable_baselines3 import PPO
-    from wrappers import make_mario_env
-
-    print(f"Loading model from {model_path}")
-    model = PPO.load(model_path)
-
-    render_mode = "human" if render else None
-    env = make_mario_env(
-        env_id=env_id,
-        actions="simple",
-        skip_frames=4,
-        resize_shape=84,
-        grayscale=True,
-        normalize=True,
-        stack_frames=4,
-        render_mode=render_mode,
-        use_reward_shaping=False,  # Don't need reward shaping for play mode
-    )
-
-    # Delay between steps for slow mode (in seconds)
-    step_delay = 0.05 if slow else 0  # 50ms delay = ~20 FPS
-
-    for episode in range(episodes):
-        obs, info = env.reset()
-        done = False
-        total_reward = 0
-        steps = 0
-
-        while not done:
-            action, _ = model.predict(obs, deterministic=True)
-            # Convert numpy array action to int for JoypadSpace
-            action = int(action) if hasattr(action, "__int__") else action.item()
-            obs, reward, done, truncated, info = env.step(action)
-            total_reward += reward
-            steps += 1
-
-            # Slow down for human viewing
-            if step_delay > 0:
-                time.sleep(step_delay)
-
-            if done or truncated:
-                break
-
-        flag = info.get("flag_get", False)
-        x_pos = info.get("x_pos", 0)
-        print(
-            f"Episode {episode + 1}: Reward={total_reward:.2f}, Steps={steps}, "
-            f"X_pos={x_pos}, Flag={'Yes!' if flag else 'No'}"
-        )
-
-    env.close()
 
 
 if __name__ == "__main__":
