@@ -25,6 +25,7 @@ def train(
     learning_rate=1e-4,
     use_lr_schedule=True,
     resume_from=None,
+    ent_coef=0.05,
 ):
     """
     Train PPO agent on Super Mario Bros.
@@ -39,6 +40,7 @@ def train(
         learning_rate: Initial learning rate
         use_lr_schedule: Whether to use linear LR decay
         resume_from: Path to model checkpoint to resume from (optional)
+        ent_coef: Entropy coefficient (higher = more exploration)
     """
     from stable_baselines3 import PPO
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
@@ -114,9 +116,9 @@ def train(
         )
         # Update hyperparameters for resumed training
         model.learning_rate = lr
-        model.ent_coef = 0.05  # Higher entropy to recover from policy collapse
+        model.ent_coef = ent_coef
         print(f"Resumed! Previous timesteps: {model.num_timesteps:,}")
-        print(f"Updated ent_coef to {model.ent_coef}")
+        print(f"Entropy coefficient: {model.ent_coef}")
     else:
         print("\nCreating new PPO model...")
         # Policy kwargs to handle normalized images
@@ -134,7 +136,7 @@ def train(
             gae_lambda=0.95,  # GAE lambda
             clip_range=0.2,  # PPO clip range
             clip_range_vf=None,  # Value function clip (None = no clipping)
-            ent_coef=0.05,  # HIGHER entropy to prevent policy collapse
+            ent_coef=ent_coef,  # Entropy coefficient for exploration
             vf_coef=0.5,  # Value function coefficient
             max_grad_norm=0.5,  # Gradient clipping
             verbose=1,
@@ -260,6 +262,12 @@ if __name__ == "__main__":
     )
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
     parser.add_argument(
+        "--ent-coef",
+        type=float,
+        default=0.05,
+        help="Entropy coefficient (higher = more exploration, default: 0.05)",
+    )
+    parser.add_argument(
         "--slow",
         action="store_true",
         help="Slow down playback for human viewing (play mode only)",
@@ -274,6 +282,7 @@ if __name__ == "__main__":
             n_envs=args.n_envs,
             learning_rate=args.lr,
             resume_from=args.resume,
+            ent_coef=args.ent_coef,
         )
     else:
         if args.model is None:
