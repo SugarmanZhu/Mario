@@ -19,7 +19,10 @@ from wrappers import make_mario_env
 
 
 def record_episode(
-    model_path: str, env_id: str = "SuperMarioBros-1-1-v0", max_steps: int = 10000
+    model_path: str,
+    env_id: str = "SuperMarioBros-1-1-v0",
+    max_steps: int = 10000,
+    actions: str = "complex",
 ) -> tuple[list[np.ndarray], dict]:
     """
     Record a single episode of gameplay.
@@ -28,22 +31,31 @@ def record_episode(
         model_path: Path to the trained model
         env_id: Environment ID
         max_steps: Maximum steps per episode
+        actions: Action space ('simple' for v1.x models, 'complex' for v2.x models)
 
     Returns:
         Tuple of (frames, info) where frames is a list of RGB arrays
     """
     import gym
-    from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+    from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, COMPLEX_MOVEMENT
     from nes_py.wrappers import JoypadSpace
     from stable_baselines3 import PPO
 
+    # Select action space
+    action_map = {
+        "simple": SIMPLE_MOVEMENT,
+        "complex": COMPLEX_MOVEMENT,
+    }
+    action_space = action_map.get(actions, COMPLEX_MOVEMENT)
+
     print(f"Loading model from {model_path}...")
+    print(f"Using {actions.upper()} action space ({len(action_space)} actions)")
     model = PPO.load(model_path)
 
     # Create the wrapped environment for the model (no rendering)
     env = make_mario_env(
         env_id=env_id,
-        actions="simple",
+        actions=actions,
         skip_frames=4,
         resize_shape=84,
         grayscale=True,
@@ -55,7 +67,7 @@ def record_episode(
 
     # Create a separate raw environment just for capturing frames
     raw_env = gym.make(env_id, apply_api_compatibility=True, render_mode="rgb_array")
-    raw_env = JoypadSpace(raw_env, SIMPLE_MOVEMENT)
+    raw_env = JoypadSpace(raw_env, action_space)
 
     frames = []
     obs, info = env.reset()
@@ -277,6 +289,13 @@ Examples:
         action="store_true",
         help="Record multiple episodes and keep the best (flag_get=True)",
     )
+    parser.add_argument(
+        "--actions",
+        type=str,
+        default="complex",
+        choices=["simple", "complex"],
+        help="Action space: 'simple' (7, for v1.x models) or 'complex' (12, for v2.x models)",
+    )
 
     args = parser.parse_args()
 
@@ -305,7 +324,10 @@ Examples:
             print(f"\n=== Episode {episode + 1}/{args.episodes} ===")
 
         frames, info = record_episode(
-            model_path=args.model, env_id=args.env, max_steps=args.max_steps
+            model_path=args.model,
+            env_id=args.env,
+            max_steps=args.max_steps,
+            actions=args.actions,
         )
 
         # Keep best episode (prioritize flag_get, then x_pos)
