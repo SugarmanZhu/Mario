@@ -52,6 +52,9 @@ def train(
 
     # Support multiple environments (comma-separated)
     env_ids = [e.strip() for e in env_id.split(",")]
+    env_ids = [e for e in env_ids if e]  # Filter out empty strings
+    if not env_ids:
+        raise ValueError(f"No valid environment IDs provided (got {env_id!r})")
     is_multi_env = len(env_ids) > 1
 
     # Extract level name for folder organization
@@ -125,9 +128,14 @@ def train(
         print(f"SubprocVecEnv failed, falling back to DummyVecEnv: {e}")
         train_env = DummyVecEnv(env_fns)
 
-    # Create evaluation environment (use first env for eval)
+    # Create evaluation environment
+    # For multi-level training, evaluate on all levels to detect forgetting
     print("Creating evaluation environment...")
-    eval_env = DummyVecEnv([make_env(env_ids[0])])
+    if is_multi_env:
+        eval_env = DummyVecEnv([make_env(eid) for eid in env_ids])
+        print(f"  Evaluating on {len(env_ids)} levels: {env_ids}")
+    else:
+        eval_env = DummyVecEnv([make_env(env_ids[0])])
 
     # Setup learning rate
     lr = linear_schedule(learning_rate) if use_lr_schedule else learning_rate
@@ -264,7 +272,7 @@ if __name__ == "__main__":
         "--env",
         type=str,
         default="SuperMarioBros-1-1-v0",
-        help="Environment ID(s), comma-separated for multi-level training (e.g., 'SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0')",
+        help="Environment ID(s), comma-separated for multi-level (e.g., 'SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0'). In play mode, levels are played sequentially.",
     )
     parser.add_argument(
         "--timesteps", type=int, default=2_000_000, help="Total training timesteps"
