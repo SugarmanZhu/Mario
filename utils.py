@@ -107,16 +107,13 @@ def get_level_from_env_id(env_id: str) -> str:
     return env_id.replace("SuperMarioBros", "").replace("-v0", "").strip("-") or "misc"
 
 
-def play(
-    model_path, env_id="SuperMarioBros-1-1-v0", episodes=5, render=True, slow=False
-):
+def play(model_path, env_id="SuperMarioBros-1-1-v0", render=True, slow=False):
     """
     Play using a trained model.
 
     Args:
         model_path: Path to saved model
-        env_id: Environment ID
-        episodes: Number of episodes to play
+        env_id: Environment ID or comma-separated list of IDs
         render: Whether to render the game
         slow: Slow down playback for human viewing
     """
@@ -127,23 +124,34 @@ def play(
     print(f"Loading model from {model_path}")
     model = PPO.load(model_path)
 
+    # Support multiple environments (comma-separated)
+    env_ids = [e.strip() for e in env_id.split(",")]
+    env_ids = [e for e in env_ids if e]  # Filter out empty strings
+
     render_mode = "human" if render else None
-    env = make_mario_env(
-        env_id=env_id,
-        actions="complex",
-        skip_frames=4,
-        resize_shape=84,
-        grayscale=True,
-        normalize=True,
-        stack_frames=4,
-        render_mode=render_mode,
-        use_reward_shaping=False,  # Don't need reward shaping for play mode
-    )
 
     # Delay between steps for slow mode (in seconds)
     step_delay = 0.05 if slow else 0  # 50ms delay = ~20 FPS
 
-    for episode in range(episodes):
+    for env_idx, current_env_id in enumerate(env_ids):
+        level_name = get_level_from_env_id(current_env_id)
+        if len(env_ids) > 1:
+            print(f"\n{'=' * 60}")
+            print(f"Level {env_idx + 1}/{len(env_ids)}: {level_name}")
+            print("=" * 60)
+
+        env = make_mario_env(
+            env_id=current_env_id,
+            actions="complex",
+            skip_frames=4,
+            resize_shape=84,
+            grayscale=True,
+            normalize=True,
+            stack_frames=4,
+            render_mode=render_mode,
+            use_reward_shaping=False,  # Don't need reward shaping for play mode
+        )
+
         obs, info = env.reset()
         done = False
         total_reward = 0
@@ -166,9 +174,10 @@ def play(
 
         flag = info.get("flag_get", False)
         x_pos = info.get("x_pos", 0)
+        prefix = f"[{level_name}] " if len(env_ids) > 1 else ""
         print(
-            f"Episode {episode + 1}: Reward={total_reward:.2f}, Steps={steps}, "
+            f"{prefix}Reward={total_reward:.2f}, Steps={steps}, "
             f"X_pos={x_pos}, Flag={'Yes!' if flag else 'No'}"
         )
 
-    env.close()
+        env.close()

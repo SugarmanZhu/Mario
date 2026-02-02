@@ -91,6 +91,7 @@
 
 ## 特性
 
+- **多关卡训练**：同时在多个关卡上训练，防止灾难性遗忘
 - **并行训练**：使用 `SubprocVecEnv` 实现真正的多进程并行
 - **自动检查点**：每10万步保存模型，支持断点续训
 - **最佳模型追踪**：自动保存评估表现最好的模型
@@ -180,17 +181,45 @@ python train_ppo.py --mode train --timesteps 10000000 --n-envs 16
 python train_ppo.py --mode train --resume ./mario_models/checkpoint.zip --timesteps 20000000
 ```
 
+### 多关卡训练
+
+同时在多个关卡上训练，防止灾难性遗忘：
+```bash
+# 同时训练1-1和1-2
+python train_ppo.py --mode train --env "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0" --timesteps 15000000
+
+# 恢复多关卡训练，使用更高的熵系数增加探索
+python train_ppo.py --resume ./mario_models/1-2/checkpoints/.../checkpoint.zip --env "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0" --timesteps 15000000 --ent-coef 0.07
+```
+
+多关卡训练特点：
+- 将并行工作进程分配到各关卡（轮询方式）
+- 在所有关卡上评估以检测遗忘
+- 保存到 `mario_models/multi-1-1-1-2/` 文件夹
+
+### 游玩模式
+
+观看训练好的智能体游玩：
+```bash
+# 单关卡
+python train_ppo.py --mode play --model ./mario_models/flag/1-1-v0.zip --slow
+
+# 多关卡（依次游玩每个关卡一次）
+python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_model.zip --env "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0" --slow
+```
+
 ## 命令行参数
 
 | 参数 | 默认值 | 描述 |
 |------|--------|------|
 | `--mode` | `train` | `train` 或 `play` |
-| `--env` | `SuperMarioBros-1-1-v0` | 环境ID |
+| `--env` | `SuperMarioBros-1-1-v0` | 环境ID，多关卡用逗号分隔 |
 | `--timesteps` | `2000000` | 总训练步数 |
 | `--n-envs` | `16` | 并行环境数 |
 | `--model` | `None` | 游玩模式的模型路径 |
 | `--resume` | `None` | 恢复训练的检查点路径 |
 | `--lr` | `0.0001` | 学习率 |
+| `--ent-coef` | `0.05` | 熵系数（越高探索越多） |
 | `--slow` | `False` | 减慢播放速度便于观看 |
 
 ## PPO超参数

@@ -31,7 +31,7 @@ def train(
     Train PPO agent on Super Mario Bros.
 
     Args:
-        env_id: Environment ID (use specific level for faster learning)
+        env_id: Environment ID or comma-separated list (e.g., "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0")
         total_timesteps: Total training steps
         n_envs: Number of parallel environments
         save_dir: Directory to save model checkpoints
@@ -50,8 +50,18 @@ def train(
         CallbackList,
     )
 
+    # Support multiple environments (comma-separated)
+    env_ids = [e.strip() for e in env_id.split(",")]
+    env_ids = [e for e in env_ids if e]  # Filter out empty strings
+    if not env_ids:
+        raise ValueError(f"No valid environment IDs provided (got {env_id!r})")
+    is_multi_env = len(env_ids) > 1
+
     # Extract level name for folder organization
-    level = get_level_from_env_id(env_id)
+    if is_multi_env:
+        level = "multi-" + "-".join(get_level_from_env_id(e) for e in env_ids)
+    else:
+        level = get_level_from_env_id(env_ids[0])
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     # Create level-specific directories
@@ -74,11 +84,16 @@ def train(
     print("=" * 60)
     print("Super Mario Bros PPO Training")
     print("=" * 60)
-    print(f"Environment: {env_id}")
+    if is_multi_env:
+        print(f"Environments: {env_ids}")
+        print(f"  (Training on {len(env_ids)} levels simultaneously)")
+    else:
+        print(f"Environment: {env_ids[0]}")
     print(f"Level: {level}")
     print(f"Total timesteps: {total_timesteps:,}")
     print(f"Parallel environments: {n_envs}")
     print(f"Learning rate: {learning_rate}")
+    print(f"Entropy coefficient: {ent_coef}")
     print(f"LR schedule: {'Linear decay' if use_lr_schedule else 'Constant'}")
     print(f"Checkpoints: {checkpoint_dir}")
     print(f"Best model: {best_model_dir}")
@@ -89,21 +104,38 @@ def train(
 
     # Create vectorized training environment
     print("\nCreating training environments...")
+
+    # Distribute environments across workers
+    if is_multi_env:
+        # Round-robin assignment of levels to workers
+        env_fns = [make_env(env_ids[i % len(env_ids)]) for i in range(n_envs)]
+        print(f"  Environment distribution:")
+        for i, eid in enumerate(env_ids):
+            count = sum(1 for j in range(n_envs) if env_ids[j % len(env_ids)] == eid)
+            print(f"    {eid}: {count} workers")
+    else:
+        env_fns = [make_env(env_ids[0]) for _ in range(n_envs)]
+
     try:
         # Use SubprocVecEnv for true parallelism (better for multiple envs)
         if n_envs > 1:
-            train_env = SubprocVecEnv([make_env(env_id) for i in range(n_envs)])
+            train_env = SubprocVecEnv(env_fns)
         else:
-            train_env = DummyVecEnv([make_env(env_id)])
+            train_env = DummyVecEnv(env_fns)
         print(f"Training env observation space: {train_env.observation_space}")
         print(f"Training env action space: {train_env.action_space}")
     except Exception as e:
         print(f"SubprocVecEnv failed, falling back to DummyVecEnv: {e}")
-        train_env = DummyVecEnv([make_env(env_id) for i in range(n_envs)])
+        train_env = DummyVecEnv(env_fns)
 
     # Create evaluation environment
+    # For multi-level training, evaluate on all levels to detect forgetting
     print("Creating evaluation environment...")
-    eval_env = DummyVecEnv([make_env(env_id)])
+    if is_multi_env:
+        eval_env = DummyVecEnv([make_env(eid) for eid in env_ids])
+        print(f"  Evaluating on {len(env_ids)} levels: {env_ids}")
+    else:
+        eval_env = DummyVecEnv([make_env(env_ids[0])])
 
     # Setup learning rate
     lr = linear_schedule(learning_rate) if use_lr_schedule else learning_rate
@@ -237,7 +269,10 @@ if __name__ == "__main__":
         help="Train or play mode",
     )
     parser.add_argument(
-        "--env", type=str, default="SuperMarioBros-1-1-v0", help="Environment ID"
+        "--env",
+        type=str,
+        default="SuperMarioBros-1-1-v0",
+        help="Environment ID(s), comma-separated for multi-level (e.g., 'SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0'). In play mode, levels are played sequentially.",
     )
     parser.add_argument(
         "--timesteps", type=int, default=2_000_000, help="Total training timesteps"
