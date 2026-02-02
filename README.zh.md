@@ -18,17 +18,13 @@
 
 一个使用 **近端策略优化 (PPO)** 学习玩超级马里奥兄弟的强化学习智能体。这是我之前基于DQN的马里奥智能体的重新实现，现在使用PPO以获得更好的稳定性和样本效率。
 
-[//]: # (## 训练好的模型)
+## 训练好的模型
 
-[//]: # ()
-[//]: # (| 关卡 | 模型 | 训练步数 | 结果 |)
+| 关卡 | 模型 | 训练步数 | 结果 |
+|------|------|---------|------|
+| 1-1 | [下载](https://github.com/SugarmanZhu/Mario/releases/download/v1.0.0/1-1-v0.zip) | ~1250万 | 通关 |
 
-[//]: # (|------|------|---------|------|)
-
-[//]: # (| 1-1 | [下载]&#40;https://github.com/SugarmanZhu/Mario/releases/download/v1.0.0/1-1-v0.zip&#41; | ~1250万 | 通关 |)
-
-[//]: # ()
-[//]: # (> 模型使用代码版本 `v1.0.0` 训练。预训练模型请查看 [Releases]&#40;https://github.com/SugarmanZhu/Mario/releases&#41;。)
+> 模型使用代码版本 `v1.0.0` 训练。预训练模型请查看 [Releases](https://github.com/SugarmanZhu/Mario/releases)。
 
 ## 为什么选择PPO而不是DQN？
 

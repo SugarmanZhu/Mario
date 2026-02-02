@@ -18,17 +18,13 @@
 
 A reinforcement learning agent that learns to play Super Mario Bros using **Proximal Policy Optimization (PPO)**. This is a reimplementation of my previous DQN-based Mario agent, now using PPO for improved stability and sample efficiency.
 
-[//]: # (## Trained Models)
+## Trained Models
 
-[//]: # ()
-[//]: # (| Level | Model | Training Steps | Result |)
+| Level | Model | Training Steps | Result |
+|-------|-------|---------------|--------|
+| 1-1 | [Download](https://github.com/SugarmanZhu/Mario/releases/download/v1.0.0/1-1-v0.zip) | ~12.5M | Completes level |
 
-[//]: # (|-------|-------|---------------|--------|)
-
-[//]: # (| 1-1 | [Download]&#40;https://github.com/SugarmanZhu/Mario/releases/download/v1.0.0/1-1-v0.zip&#41; | ~12.5M | Completes level |)
-
-[//]: # ()
-[//]: # (> Models trained with code version `v1.0.0`. See [Releases]&#40;https://github.com/SugarmanZhu/Mario/releases&#41; for pre-trained models.)
+> Models trained with code version `v1.0.0`. See [Releases](https://github.com/SugarmanZhu/Mario/releases) for pre-trained models.
 
 ## Why PPO over DQN?
 
