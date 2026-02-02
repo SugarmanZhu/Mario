@@ -70,7 +70,7 @@ def diagnose_single_model(model_path, render=False, env_id="SuperMarioBros-1-1-v
     render_mode = "human" if render else None
     env = make_mario_env(
         env_id=env_id,
-        actions="simple",
+        actions="complex",
         skip_frames=4,
         resize_shape=84,
         grayscale=True,
@@ -80,10 +80,10 @@ def diagnose_single_model(model_path, render=False, env_id="SuperMarioBros-1-1-v
         use_reward_shaping=False,
     )
 
-    # Get SIMPLE_MOVEMENT action names
-    from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+    # Get COMPLEX_MOVEMENT action names
+    from gym_super_mario_bros.actions import COMPLEX_MOVEMENT
 
-    action_names = {i: str(SIMPLE_MOVEMENT[i]) for i in range(len(SIMPLE_MOVEMENT))}
+    action_names = {i: str(COMPLEX_MOVEMENT[i]) for i in range(len(COMPLEX_MOVEMENT))}
 
     stats = analyze_model_actions(model_path, env, n_steps=500, deterministic=True)
 
@@ -151,7 +151,7 @@ def find_healthy_checkpoint(
 
     env = make_mario_env(
         env_id=env_id,
-        actions="simple",
+        actions="complex",
         skip_frames=4,
         resize_shape=84,
         grayscale=True,

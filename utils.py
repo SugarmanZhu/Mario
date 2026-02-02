@@ -82,7 +82,7 @@ def make_env(env_id, render_mode=None, use_reward_shaping=True):
 
         env = make_mario_env(
             env_id=env_id,
-            actions="simple",  # 7 actions
+            actions="complex",  # 12 actions (includes down for pipes, up for vines)
             skip_frames=4,
             resize_shape=84,
             grayscale=True,
@@ -130,7 +130,7 @@ def play(
     render_mode = "human" if render else None
     env = make_mario_env(
         env_id=env_id,
-        actions="simple",
+        actions="complex",
         skip_frames=4,
         resize_shape=84,
         grayscale=True,

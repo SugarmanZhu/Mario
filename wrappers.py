@@ -2,6 +2,7 @@
 Custom wrappers for Super Mario Bros environment.
 These handle preprocessing for RL training with PPO.
 """
+
 import suppress_warnings  # noqa: F401 - must be first to suppress gym warnings
 
 import gym
@@ -15,6 +16,7 @@ class SkipFrame(gym.Wrapper):
     Return only every `skip`-th frame.
     Repeats the same action for `skip` frames and sums rewards.
     """
+
     def __init__(self, env, skip=4):
         super().__init__(env)
         self._skip = skip
@@ -25,18 +27,19 @@ class SkipFrame(gym.Wrapper):
         truncated = False
         obs = None
         info = {}
-        
+
         for _ in range(self._skip):
             obs, reward, done, truncated, info = self.env.step(action)
             total_reward += reward
             if done or truncated:
                 break
-        
+
         return obs, total_reward, done, truncated, info
 
 
 class GrayScaleObservation(gym.ObservationWrapper):
     """Convert observation to grayscale."""
+
     def __init__(self, env):
         super().__init__(env)
         obs_shape = self.observation_space.shape[:2]
@@ -52,22 +55,21 @@ class GrayScaleObservation(gym.ObservationWrapper):
 
 class ResizeObservation(gym.ObservationWrapper):
     """Resize observation to (shape, shape)."""
+
     def __init__(self, env, shape=84):
         super().__init__(env)
         if isinstance(shape, int):
             self.shape = (shape, shape)
         else:
             self.shape = tuple(shape)
-        
+
         obs_shape = self.shape + self.observation_space.shape[2:]
         self.observation_space = spaces.Box(
             low=0, high=255, shape=obs_shape, dtype=np.uint8
         )
 
     def observation(self, observation):
-        observation = cv2.resize(
-            observation, self.shape, interpolation=cv2.INTER_AREA
-        )
+        observation = cv2.resize(observation, self.shape, interpolation=cv2.INTER_AREA)
         if len(observation.shape) == 2:
             observation = np.expand_dims(observation, axis=-1)
         return observation
@@ -75,6 +77,7 @@ class ResizeObservation(gym.ObservationWrapper):
 
 class NormalizeObservation(gym.ObservationWrapper):
     """Normalize observation to [0, 1]."""
+
     def __init__(self, env):
         super().__init__(env)
         obs_shape = self.observation_space.shape
@@ -88,11 +91,12 @@ class NormalizeObservation(gym.ObservationWrapper):
 
 class FrameStack(gym.Wrapper):
     """Stack n_frames consecutive frames."""
+
     def __init__(self, env, n_frames=4):
         super().__init__(env)
         self.n_frames = n_frames
         self.frames = None
-        
+
         # Update observation space
         obs_shape = env.observation_space.shape
         # Stack along the last dimension (channel dimension)
@@ -101,20 +105,20 @@ class FrameStack(gym.Wrapper):
             low=0.0 if env.observation_space.dtype == np.float32 else 0,
             high=1.0 if env.observation_space.dtype == np.float32 else 255,
             shape=new_shape,
-            dtype=env.observation_space.dtype
+            dtype=env.observation_space.dtype,
         )
 
     def reset(self, **kwargs):
         # Remove seed/options that old gym envs don't support
-        kwargs.pop('seed', None)
-        kwargs.pop('options', None)
+        kwargs.pop("seed", None)
+        kwargs.pop("options", None)
         result = self.env.reset(**kwargs)
         if isinstance(result, tuple):
             obs, info = result
         else:
             obs = result
             info = {}
-        
+
         # Initialize frame stack with copies of first observation
         self.frames = [obs] * self.n_frames
         stacked = np.concatenate(self.frames, axis=-1)
@@ -122,17 +126,18 @@ class FrameStack(gym.Wrapper):
 
     def step(self, action):
         obs, reward, done, truncated, info = self.env.step(action)
-        
+
         # Update frame stack
         self.frames.pop(0)
         self.frames.append(obs)
         stacked = np.concatenate(self.frames, axis=-1)
-        
+
         return stacked, reward, done, truncated, info
 
 
 class TransposeObservation(gym.ObservationWrapper):
     """Transpose observation from (H, W, C) to (C, H, W) for PyTorch CNN."""
+
     def __init__(self, env):
         super().__init__(env)
         obs_shape = self.observation_space.shape
@@ -142,7 +147,7 @@ class TransposeObservation(gym.ObservationWrapper):
             low=self.observation_space.low.transpose(2, 0, 1),
             high=self.observation_space.high.transpose(2, 0, 1),
             shape=new_shape,
-            dtype=self.observation_space.dtype
+            dtype=self.observation_space.dtype,
         )
 
     def observation(self, observation):
@@ -153,7 +158,7 @@ class TransposeObservation(gym.ObservationWrapper):
 class CustomRewardWrapper(gym.Wrapper):
     """
     Custom reward shaping to prevent policy collapse.
-    
+
     Key changes:
     1. Reward forward progress (x_pos increase)
     2. Penalize standing still / moving backward
@@ -161,16 +166,25 @@ class CustomRewardWrapper(gym.Wrapper):
     4. Time pressure to prevent standing still
     5. Score increase reward (coins, enemies, etc.)
     """
-    def __init__(self, env, forward_reward_scale=0.1, death_penalty=-50, 
-                 stuck_penalty=-0.5, flag_bonus=100, time_penalty=-0.01,
-                 score_reward_scale=0.01, coin_bonus=5.0):
+
+    def __init__(
+        self,
+        env,
+        forward_reward_scale=0.1,
+        death_penalty=-50,
+        stuck_penalty=-0.5,
+        flag_bonus=100,
+        time_penalty=-0.01,
+        score_reward_scale=0.01,
+        coin_bonus=5.0,
+    ):
         super().__init__(env)
         self._prev_x_pos = 0
         self._prev_time = 400
         self._prev_score = 0
         self._prev_coins = 0
         self._stuck_counter = 0
-        
+
         # Reward shaping parameters
         self.forward_reward_scale = forward_reward_scale
         self.death_penalty = death_penalty
@@ -179,7 +193,7 @@ class CustomRewardWrapper(gym.Wrapper):
         self.time_penalty = time_penalty
         self.score_reward_scale = score_reward_scale
         self.coin_bonus = coin_bonus
-        
+
     def reset(self, **kwargs):
         result = self.env.reset(**kwargs)
         if isinstance(result, tuple):
@@ -187,31 +201,31 @@ class CustomRewardWrapper(gym.Wrapper):
         else:
             obs = result
             info = {}
-        
-        self._prev_x_pos = info.get('x_pos', 0)
-        self._prev_time = info.get('time', 400)
-        self._prev_score = info.get('score', 0)
-        self._prev_coins = info.get('coins', 0)
+
+        self._prev_x_pos = info.get("x_pos", 0)
+        self._prev_time = info.get("time", 400)
+        self._prev_score = info.get("score", 0)
+        self._prev_coins = info.get("coins", 0)
         self._stuck_counter = 0
         return obs, info
-    
+
     def step(self, action):
         obs, reward, done, truncated, info = self.env.step(action)
-        
+
         # Get current state
-        x_pos = info.get('x_pos', 0)
-        time_left = info.get('time', 400)
-        flag_get = info.get('flag_get', False)
-        score = info.get('score', 0)
-        coins = info.get('coins', 0)
-        
+        x_pos = info.get("x_pos", 0)
+        time_left = info.get("time", 400)
+        flag_get = info.get("flag_get", False)
+        score = info.get("score", 0)
+        coins = info.get("coins", 0)
+
         # Calculate shaped reward
         shaped_reward = 0
-        
+
         # 1. Forward progress reward (most important!)
         x_delta = x_pos - self._prev_x_pos
         shaped_reward += x_delta * self.forward_reward_scale
-        
+
         # 2. Stuck penalty - if Mario hasn't moved in a while
         if x_delta <= 0:
             self._stuck_counter += 1
@@ -219,54 +233,54 @@ class CustomRewardWrapper(gym.Wrapper):
                 shaped_reward += self.stuck_penalty
         else:
             self._stuck_counter = 0
-        
+
         # 3. Time pressure - small penalty for time passing
         shaped_reward += self.time_penalty
-        
+
         # 4. Flag bonus
         if flag_get:
             shaped_reward += self.flag_bonus
-        
+
         # 5. Death penalty
         if done and not flag_get:
             shaped_reward += self.death_penalty
-        
+
         # 6. Score increase reward (killing enemies, collecting power-ups, etc.)
         score_delta = score - self._prev_score
         if score_delta > 0:
             shaped_reward += score_delta * self.score_reward_scale
-        
+
         # 7. Coin bonus
         coin_delta = coins - self._prev_coins
         if coin_delta > 0:
             shaped_reward += coin_delta * self.coin_bonus
-        
+
         # Combine original reward with shaped reward
         total_reward = reward + shaped_reward
-        
+
         # Update state
         self._prev_x_pos = x_pos
         self._prev_time = time_left
         self._prev_score = score
         self._prev_coins = coins
-        
+
         return obs, total_reward, done, truncated, info
 
 
 def make_mario_env(
-    env_id='SuperMarioBros-v0',
-    actions='simple',
+    env_id="SuperMarioBros-v0",
+    actions="complex",
     skip_frames=4,
     resize_shape=84,
     grayscale=True,
     normalize=True,
     stack_frames=4,
     render_mode=None,
-    use_reward_shaping=True
+    use_reward_shaping=True,
 ):
     """
     Create a preprocessed Super Mario Bros environment.
-    
+
     Args:
         env_id: Environment ID (e.g., 'SuperMarioBros-v0', 'SuperMarioBros-1-1-v0')
         actions: 'simple' (7 actions), 'right_only' (5 actions), or 'complex' (12 actions)
@@ -277,90 +291,90 @@ def make_mario_env(
         stack_frames: Number of frames to stack
         render_mode: 'human' for visual rendering, 'rgb_array' for array, None for no render
         use_reward_shaping: Apply custom reward shaping to prevent policy collapse
-    
+
     Returns:
         Preprocessed environment
     """
     import gym_super_mario_bros
-    from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, RIGHT_ONLY, COMPLEX_MOVEMENT
+    from gym_super_mario_bros.actions import (
+        SIMPLE_MOVEMENT,
+        RIGHT_ONLY,
+        COMPLEX_MOVEMENT,
+    )
     from nes_py.wrappers import JoypadSpace
-    
+
     # Select action space
     action_map = {
-        'simple': SIMPLE_MOVEMENT,
-        'right_only': RIGHT_ONLY,
-        'complex': COMPLEX_MOVEMENT
+        "simple": SIMPLE_MOVEMENT,
+        "right_only": RIGHT_ONLY,
+        "complex": COMPLEX_MOVEMENT,
     }
     action_space = action_map.get(actions, SIMPLE_MOVEMENT)
-    
+
     # Create base environment with compatibility mode for new gym API
-    env = gym.make(
-        env_id,
-        apply_api_compatibility=True,
-        render_mode=render_mode
-    )
-    
+    env = gym.make(env_id, apply_api_compatibility=True, render_mode=render_mode)
+
     # Apply JoypadSpace to reduce action space
     env = JoypadSpace(env, action_space)
-    
+
     # Apply custom reward shaping BEFORE other wrappers (needs access to info dict)
     if use_reward_shaping:
         env = CustomRewardWrapper(env)
-    
+
     # Apply preprocessing wrappers
     if skip_frames > 1:
         env = SkipFrame(env, skip=skip_frames)
-    
+
     if grayscale:
         env = GrayScaleObservation(env)
-    
+
     if resize_shape:
         env = ResizeObservation(env, shape=resize_shape)
-    
+
     if normalize:
         env = NormalizeObservation(env)
-    
+
     if stack_frames > 1:
         env = FrameStack(env, n_frames=stack_frames)
-    
+
     # Transpose to channel-first format (C, H, W) for PyTorch/SB3
     env = TransposeObservation(env)
-    
+
     return env
 
 
 def test_wrappers():
     """Test the preprocessing pipeline."""
     print("Testing preprocessing wrappers...")
-    
+
     env = make_mario_env(
-        env_id='SuperMarioBros-v0',
-        actions='simple',
+        env_id="SuperMarioBros-v0",
+        actions="complex",
         skip_frames=4,
         resize_shape=84,
         grayscale=True,
         normalize=True,
         stack_frames=4,
-        render_mode=None
+        render_mode=None,
     )
-    
+
     print(f"Observation space: {env.observation_space}")
     print(f"Action space: {env.action_space}")
-    
+
     obs, info = env.reset()
     print(f"Observation shape: {obs.shape}")
     print(f"Observation dtype: {obs.dtype}")
     print(f"Observation range: [{obs.min():.2f}, {obs.max():.2f}]")
-    
+
     # Run a few steps
     for i in range(10):
         action = env.action_space.sample()
         obs, reward, done, truncated, info = env.step(action)
-        print(f"Step {i+1}: reward={reward:.2f}, done={done}")
-        
+        print(f"Step {i + 1}: reward={reward:.2f}, done={done}")
+
         if done:
             env.reset()
-    
+
     env.close()
     print("Wrapper test completed!")
 
