@@ -91,6 +91,7 @@ A reinforcement learning agent that learns to play Super Mario Bros using **Prox
 
 ## Features
 
+- **Multi-Level Training**: Train on multiple levels simultaneously to prevent catastrophic forgetting
 - **Parallel Training**: Uses `SubprocVecEnv` for true multi-process parallelism
 - **Automatic Checkpointing**: Saves model every 100K steps with resume support
 - **Best Model Tracking**: Automatically saves the best performing model
@@ -180,17 +181,45 @@ Resume from a checkpoint:
 python train_ppo.py --mode train --resume ./mario_models/checkpoint.zip --timesteps 20000000
 ```
 
+### Multi-Level Training
+
+Train on multiple levels simultaneously to prevent catastrophic forgetting:
+```bash
+# Train on 1-1 and 1-2 together
+python train_ppo.py --mode train --env "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0" --timesteps 15000000
+
+# Resume multi-level training with higher entropy for exploration
+python train_ppo.py --resume ./mario_models/1-2/checkpoints/.../checkpoint.zip --env "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0" --timesteps 15000000 --ent-coef 0.07
+```
+
+Multi-level training:
+- Distributes parallel workers across levels (round-robin)
+- Evaluates on all levels to detect forgetting
+- Saves to `mario_models/multi-1-1-1-2/` folder
+
+### Play Mode
+
+Watch a trained agent play:
+```bash
+# Single level
+python train_ppo.py --mode play --model ./mario_models/flag/1-1-v0.zip --slow
+
+# Multiple levels (plays each level once, sequentially)
+python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_model.zip --env "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0" --slow
+```
+
 ## Command Line Arguments
 
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `--mode` | `train` | `train` or `play` |
-| `--env` | `SuperMarioBros-1-1-v0` | Environment ID |
+| `--env` | `SuperMarioBros-1-1-v0` | Environment ID(s), comma-separated for multi-level |
 | `--timesteps` | `2000000` | Total training timesteps |
 | `--n-envs` | `16` | Number of parallel environments |
 | `--model` | `None` | Model path for play mode |
 | `--resume` | `None` | Checkpoint path to resume training |
 | `--lr` | `0.0001` | Learning rate |
+| `--ent-coef` | `0.05` | Entropy coefficient (higher = more exploration) |
 | `--slow` | `False` | Slow down playback for viewing |
 
 ## PPO Hyperparameters
