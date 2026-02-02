@@ -15,12 +15,13 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from utils import normalize_env_id
 from wrappers import make_mario_env
 
 
 def record_episode(
     model_path: str,
-    env_id: str = "SuperMarioBros-1-1-v0",
+    env_id: str = "1-1",
     max_steps: int = 10000,
     actions: str = "complex",
 ) -> tuple[list[np.ndarray], dict]:
@@ -29,7 +30,7 @@ def record_episode(
 
     Args:
         model_path: Path to the trained model
-        env_id: Environment ID
+        env_id: Environment ID (shorthand like '1-1' or full ID)
         max_steps: Maximum steps per episode
         actions: Action space ('simple' for v1.x models, 'complex' for v2.x models)
 
@@ -40,6 +41,9 @@ def record_episode(
     from gym_super_mario_bros.actions import SIMPLE_MOVEMENT, COMPLEX_MOVEMENT
     from nes_py.wrappers import JoypadSpace
     from stable_baselines3 import PPO
+
+    # Normalize env_id (support shorthand)
+    env_id = normalize_env_id(env_id)
 
     # Select action space
     action_map = {
@@ -261,7 +265,10 @@ Examples:
         help="Output file path (supports .gif, .mp4, .webp)",
     )
     parser.add_argument(
-        "--env", type=str, default="SuperMarioBros-1-1-v0", help="Environment ID"
+        "--env",
+        type=str,
+        default="1-1",
+        help="Environment ID (e.g., '1-1' or 'SuperMarioBros-1-1-v0')",
     )
     parser.add_argument(
         "--fps", type=int, default=30, help="Frames per second (default: 30)"

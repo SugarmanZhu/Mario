@@ -107,13 +107,63 @@ def get_level_from_env_id(env_id: str) -> str:
     return env_id.replace("SuperMarioBros", "").replace("-v0", "").strip("-") or "misc"
 
 
-def play(model_path, env_id="SuperMarioBros-1-1-v0", render=True, slow=False):
+def normalize_env_id(env_id: str) -> str:
+    """
+    Normalize environment ID to full format.
+
+    Supports shorthand notation:
+        '1-1' -> 'SuperMarioBros-1-1-v0'
+        '1-2' -> 'SuperMarioBros-1-2-v0'
+        'SuperMarioBros-1-1-v0' -> 'SuperMarioBros-1-1-v0' (unchanged)
+
+    Args:
+        env_id: Environment ID (shorthand or full)
+
+    Returns:
+        Full environment ID
+    """
+    import re
+
+    # Already full format
+    if env_id.startswith("SuperMarioBros"):
+        return env_id
+
+    # Shorthand format: '1-1', '2-3', etc.
+    match = re.match(r"^(\d+-\d+)$", env_id.strip())
+    if match:
+        return f"SuperMarioBros-{match.group(1)}-v0"
+
+    # Unknown format, return as-is
+    return env_id
+
+
+def normalize_env_ids(env_id: str) -> list[str]:
+    """
+    Parse and normalize comma-separated environment IDs.
+
+    Args:
+        env_id: Single env ID or comma-separated list (e.g., '1-1,1-2')
+
+    Returns:
+        List of normalized environment IDs
+
+    Raises:
+        ValueError: If no valid environment IDs provided
+    """
+    env_ids = [e.strip() for e in env_id.split(",")]
+    env_ids = [e for e in env_ids if e]  # Filter out empty strings
+    if not env_ids:
+        raise ValueError(f"No valid environment IDs provided (got {env_id!r})")
+    return [normalize_env_id(e) for e in env_ids]
+
+
+def play(model_path, env_id="1-1", render=True, slow=False):
     """
     Play using a trained model.
 
     Args:
         model_path: Path to saved model
-        env_id: Environment ID or comma-separated list of IDs
+        env_id: Environment ID or comma-separated list (e.g., '1-1' or '1-1,1-2')
         render: Whether to render the game
         slow: Slow down playback for human viewing
     """
@@ -124,9 +174,8 @@ def play(model_path, env_id="SuperMarioBros-1-1-v0", render=True, slow=False):
     print(f"Loading model from {model_path}")
     model = PPO.load(model_path)
 
-    # Support multiple environments (comma-separated)
-    env_ids = [e.strip() for e in env_id.split(",")]
-    env_ids = [e for e in env_ids if e]  # Filter out empty strings
+    # Support multiple environments (comma-separated) with shorthand
+    env_ids = normalize_env_ids(env_id)
 
     render_mode = "human" if render else None
 

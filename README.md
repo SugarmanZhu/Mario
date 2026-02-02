@@ -126,14 +126,14 @@ pip install -r requirements.txt
 # Test environment
 python test_env.py
 
-# Train agent
-python train_ppo.py --mode train --timesteps 10000000 --n-envs 16
+# Train agent (--env supports shorthand: '1-1' = 'SuperMarioBros-1-1-v0')
+python train_ppo.py --timesteps 10000000 --n-envs 16
 
 # Watch trained agent play
-python train_ppo.py --mode play --model ./mario_models/flag/1-1-v0.zip --slow
+python train_ppo.py --mode play --model ./mario_models/1-1/best/best_model.zip --slow
 
 # Record gameplay video
-python record_video.py --model ./mario_models/flag/1-1-v0.zip --output demo.gif
+python record_video.py --model ./mario_models/1-1/best/best_model.zip --output demo.gif
 ```
 
 ## Recording Gameplay
@@ -173,23 +173,23 @@ Mario/
 
 Start a new training run:
 ```bash
-python train_ppo.py --mode train --timesteps 10000000 --n-envs 16
+python train_ppo.py --timesteps 10000000 --n-envs 16
 ```
 
 Resume from a checkpoint:
 ```bash
-python train_ppo.py --mode train --resume ./mario_models/checkpoint.zip --timesteps 20000000
+python train_ppo.py --resume ./mario_models/1-1/checkpoints/.../checkpoint.zip --timesteps 20000000
 ```
 
 ### Multi-Level Training
 
 Train on multiple levels simultaneously to prevent catastrophic forgetting:
 ```bash
-# Train on 1-1 and 1-2 together
-python train_ppo.py --mode train --env "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0" --timesteps 15000000
+# Train on 1-1 and 1-2 together (shorthand supported)
+python train_ppo.py --env "1-1,1-2" --timesteps 15000000
 
 # Resume multi-level training with higher entropy for exploration
-python train_ppo.py --resume ./mario_models/1-2/checkpoints/.../checkpoint.zip --env "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0" --timesteps 15000000 --ent-coef 0.07
+python train_ppo.py --resume ./mario_models/1-2/checkpoints/.../checkpoint.zip --env "1-1,1-2" --timesteps 15000000 --ent-coef 0.07
 ```
 
 Multi-level training:
@@ -202,10 +202,10 @@ Multi-level training:
 Watch a trained agent play:
 ```bash
 # Single level
-python train_ppo.py --mode play --model ./mario_models/flag/1-1-v0.zip --slow
+python train_ppo.py --mode play --model ./mario_models/1-1/best/best_model.zip --slow
 
 # Multiple levels (plays each level once, sequentially)
-python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_model.zip --env "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0" --slow
+python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_model.zip --env "1-1,1-2" --slow
 ```
 
 ## Command Line Arguments
@@ -213,7 +213,7 @@ python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_m
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `--mode` | `train` | `train` or `play` |
-| `--env` | `SuperMarioBros-1-1-v0` | Environment ID(s), comma-separated for multi-level |
+| `--env` | `1-1` | Environment ID(s), supports shorthand (e.g., `1-1`, `1-1,1-2`) |
 | `--timesteps` | `2000000` | Total training timesteps |
 | `--n-envs` | `16` | Number of parallel environments |
 | `--model` | `None` | Model path for play mode |

@@ -12,7 +12,7 @@ import suppress_warnings  # noqa: F401
 import os
 from glob import glob
 
-from utils import compute_policy_health
+from utils import compute_policy_health, normalize_env_id
 
 
 def analyze_model_actions(model_path, env, n_steps=500, deterministic=True):
@@ -58,9 +58,12 @@ def analyze_model_actions(model_path, env, n_steps=500, deterministic=True):
     }
 
 
-def diagnose_single_model(model_path, render=False, env_id="SuperMarioBros-1-1-v0"):
+def diagnose_single_model(model_path, render=False, env_id="1-1"):
     """Diagnose a single model for policy collapse."""
     from wrappers import make_mario_env
+
+    # Normalize env_id (support shorthand)
+    env_id = normalize_env_id(env_id)
 
     print(f"\n{'=' * 60}")
     print(f"Diagnosing: {os.path.basename(model_path)}")
@@ -121,11 +124,12 @@ def diagnose_single_model(model_path, render=False, env_id="SuperMarioBros-1-1-v
     return stats
 
 
-def find_healthy_checkpoint(
-    model_dir, max_checkpoints=10, env_id="SuperMarioBros-1-1-v0"
-):
+def find_healthy_checkpoint(model_dir, max_checkpoints=10, env_id="1-1"):
     """Find the most recent healthy checkpoint before policy collapse."""
     from wrappers import make_mario_env
+
+    # Normalize env_id (support shorthand)
+    env_id = normalize_env_id(env_id)
 
     checkpoints = sorted(glob(os.path.join(model_dir, "*_steps.zip")))
 
@@ -222,8 +226,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--env",
         type=str,
-        default="SuperMarioBros-1-1-v0",
-        help="Environment ID (e.g., SuperMarioBros-1-2-v0)",
+        default="1-1",
+        help="Environment ID (e.g., '1-1' or 'SuperMarioBros-1-2-v0')",
     )
 
     args = parser.parse_args()

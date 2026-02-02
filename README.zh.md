@@ -126,14 +126,14 @@ pip install -r requirements.txt
 # 测试环境
 python test_env.py
 
-# 训练智能体
-python train_ppo.py --mode train --timesteps 10000000 --n-envs 16
+# 训练智能体（--env 支持简写：'1-1' = 'SuperMarioBros-1-1-v0'）
+python train_ppo.py --timesteps 10000000 --n-envs 16
 
 # 观看训练好的智能体游玩
-python train_ppo.py --mode play --model ./mario_models/flag/1-1-v0.zip --slow
+python train_ppo.py --mode play --model ./mario_models/1-1/best/best_model.zip --slow
 
 # 录制游戏视频
-python record_video.py --model ./mario_models/flag/1-1-v0.zip --output demo.gif
+python record_video.py --model ./mario_models/1-1/best/best_model.zip --output demo.gif
 ```
 
 ## 录制游戏视频
@@ -173,23 +173,23 @@ Mario/
 
 开始新的训练：
 ```bash
-python train_ppo.py --mode train --timesteps 10000000 --n-envs 16
+python train_ppo.py --timesteps 10000000 --n-envs 16
 ```
 
 从检查点恢复：
 ```bash
-python train_ppo.py --mode train --resume ./mario_models/checkpoint.zip --timesteps 20000000
+python train_ppo.py --resume ./mario_models/1-1/checkpoints/.../checkpoint.zip --timesteps 20000000
 ```
 
 ### 多关卡训练
 
 同时在多个关卡上训练，防止灾难性遗忘：
 ```bash
-# 同时训练1-1和1-2
-python train_ppo.py --mode train --env "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0" --timesteps 15000000
+# 同时训练1-1和1-2（支持简写）
+python train_ppo.py --env "1-1,1-2" --timesteps 15000000
 
 # 恢复多关卡训练，使用更高的熵系数增加探索
-python train_ppo.py --resume ./mario_models/1-2/checkpoints/.../checkpoint.zip --env "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0" --timesteps 15000000 --ent-coef 0.07
+python train_ppo.py --resume ./mario_models/1-2/checkpoints/.../checkpoint.zip --env "1-1,1-2" --timesteps 15000000 --ent-coef 0.07
 ```
 
 多关卡训练特点：
@@ -202,10 +202,10 @@ python train_ppo.py --resume ./mario_models/1-2/checkpoints/.../checkpoint.zip -
 观看训练好的智能体游玩：
 ```bash
 # 单关卡
-python train_ppo.py --mode play --model ./mario_models/flag/1-1-v0.zip --slow
+python train_ppo.py --mode play --model ./mario_models/1-1/best/best_model.zip --slow
 
 # 多关卡（依次游玩每个关卡一次）
-python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_model.zip --env "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0" --slow
+python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_model.zip --env "1-1,1-2" --slow
 ```
 
 ## 命令行参数
@@ -213,7 +213,7 @@ python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_m
 | 参数 | 默认值 | 描述 |
 |------|--------|------|
 | `--mode` | `train` | `train` 或 `play` |
-| `--env` | `SuperMarioBros-1-1-v0` | 环境ID，多关卡用逗号分隔 |
+| `--env` | `1-1` | 环境ID，支持简写（如 `1-1`、`1-1,1-2`） |
 | `--timesteps` | `2000000` | 总训练步数 |
 | `--n-envs` | `16` | 并行环境数 |
 | `--model` | `None` | 游玩模式的模型路径 |

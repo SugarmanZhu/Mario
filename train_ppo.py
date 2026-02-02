@@ -12,11 +12,17 @@ import time
 from datetime import datetime
 
 from callbacks import PolicyCollapseCallback
-from utils import linear_schedule, make_env, get_level_from_env_id, play
+from utils import (
+    linear_schedule,
+    make_env,
+    get_level_from_env_id,
+    play,
+    normalize_env_ids,
+)
 
 
 def train(
-    env_id="SuperMarioBros-1-1-v0",
+    env_id="1-1",
     total_timesteps=2_000_000,
     n_envs=8,
     save_dir="./mario_models",
@@ -31,7 +37,7 @@ def train(
     Train PPO agent on Super Mario Bros.
 
     Args:
-        env_id: Environment ID or comma-separated list (e.g., "SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0")
+        env_id: Environment ID or comma-separated list (e.g., '1-1,1-2' or 'SuperMarioBros-1-1-v0')
         total_timesteps: Total training steps
         n_envs: Number of parallel environments
         save_dir: Directory to save model checkpoints
@@ -50,11 +56,8 @@ def train(
         CallbackList,
     )
 
-    # Support multiple environments (comma-separated)
-    env_ids = [e.strip() for e in env_id.split(",")]
-    env_ids = [e for e in env_ids if e]  # Filter out empty strings
-    if not env_ids:
-        raise ValueError(f"No valid environment IDs provided (got {env_id!r})")
+    # Support multiple environments (comma-separated) with shorthand
+    env_ids = normalize_env_ids(env_id)
     is_multi_env = len(env_ids) > 1
 
     # Extract level name for folder organization
@@ -271,8 +274,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--env",
         type=str,
-        default="SuperMarioBros-1-1-v0",
-        help="Environment ID(s), comma-separated for multi-level (e.g., 'SuperMarioBros-1-1-v0,SuperMarioBros-1-2-v0'). In play mode, levels are played sequentially.",
+        default="1-1",
+        help="Environment ID(s), supports shorthand (e.g., '1-1', '1-1,1-2'). In play mode, levels are played sequentially.",
     )
     parser.add_argument(
         "--timesteps", type=int, default=2_000_000, help="Total training timesteps"
