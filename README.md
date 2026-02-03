@@ -16,21 +16,21 @@
 
 ---
 
-A reinforcement learning agent that learns to play Super Mario Bros using **Proximal Policy Optimization (PPO)**. This is a reimplementation of my previous DQN-based Mario agent, now using PPO for improved stability and sample efficiency.
+A reinforcement learning agent that learns to play Super Mario Bros using **Proximal Policy Optimization (PPO)**. This is a reimplementation of my previous DQN-based Mario agent, now using PPO for improved stability and sample efficiency. v2.0 introduces an **IMPALA CNN** architecture with **RGB observations** for robust multi-level training.
 
 ## Version Compatibility
 
 > [!WARNING]
-> **Breaking Change in v2.0.0**
+> **Breaking Changes**
 >
-> | Version | Action Space | Actions | Compatible Models |
-> |---------|--------------|---------|-------------------|
-> | v1.x | SIMPLE_MOVEMENT | 7 | v1.x only |
-> | v2.x | COMPLEX_MOVEMENT | 12 | v2.x only |
+> | Version | Observation | CNN | Action Space | Compatible Models |
+> |---------|-------------|-----|--------------|-------------------|
+> | v1.x | 84×84 grayscale | NatureCNN | 7 actions | v1.x only |
+> | v2.x | 128×120 RGB | IMPALA | 12 actions | v2.x only |
 >
-> **v1.x and v2.x models are NOT compatible** due to different action space sizes.
+> **Models are NOT compatible across major versions** due to architecture changes.
 >
-> v2.0 adds `down` (enter pipes), `up` (climb vines), and full left movement actions.
+> - v2.0: Added `down` (enter pipes), `up` (climb vines), full left movement, RGB observations, IMPALA CNN, entropy decay for multi-level training
 
 ## Trained Models
 
@@ -91,19 +91,79 @@ A reinforcement learning agent that learns to play Super Mario Bros using **Prox
 
 ## Features
 
-- **Multi-Level Training**: Train on multiple levels simultaneously to prevent catastrophic forgetting
+- **Multi-Level Training**: Train on multiple levels simultaneously without catastrophic forgetting
+- **IMPALA CNN Architecture**: Residual CNN with ~4M parameters for better multi-task learning
+- **RGB Observations**: 128×120 RGB (not grayscale) - agent can see HUD text, powerup colors, level backgrounds
+- **Entropy Decay**: Automatic decay from 0.08 → 0.01 for exploration-to-exploitation transition
 - **Parallel Training**: Uses `SubprocVecEnv` for true multi-process parallelism
+- **Memory Efficient**: uint8 observations with on-the-fly normalization (~11GB rollout buffer for 32 envs)
 - **Automatic Checkpointing**: Saves model every 100K steps with resume support
 - **Best Model Tracking**: Automatically saves the best performing model
 - **TensorBoard Integration**: Real-time training visualization
 - **Video Recording**: Record gameplay as GIF/MP4/WebP
 - **Policy Collapse Detection**: Automatic detection and recovery
 
-## Hardware Used
+## Architecture (v2.0)
 
-- **GPU**: NVIDIA GeForce RTX 5090 (32GB VRAM)
-- **RAM**: 64GB
-- **OS**: Windows 11
+### Observation Pipeline
+
+```
+NES Frame (256×240 RGB)
+    ↓
+Resize to 128×120 (half resolution, preserves aspect ratio)
+    ↓
+Frame Stack (4 frames)
+    ↓
+Transpose to channels-first (12, 120, 128) uint8
+    ↓
+Normalize on-the-fly to float32 [0, 1] (GPU only)
+```
+
+### IMPALA CNN
+
+```
+Input: (12, 120, 128) - 4 RGB frames stacked
+    ↓
+Stage 1: Conv3×3(12→16) → MaxPool3×3(s=2) → 2× ResBlock
+    ↓
+Stage 2: Conv3×3(16→32) → MaxPool3×3(s=2) → 2× ResBlock
+    ↓
+Stage 3: Conv3×3(32→32) → MaxPool3×3(s=2) → 2× ResBlock
+    ↓
+Flatten → Linear(512) → ReLU
+    ↓
+Policy head: Linear(256) → Linear(256) → 12 actions
+Value head: Linear(256) → Linear(256) → 1 value
+```
+
+**Why IMPALA over NatureCNN?**
+- Residual connections prevent gradient degradation
+- Better multi-task learning (can distinguish levels visually)
+- ~4M parameters (similar size to NatureCNN)
+
+### Why RGB over Grayscale?
+
+| Feature | Grayscale | RGB |
+|---------|-----------|-----|
+| HUD text ("WORLD 1-1") | Hard to read | Clear |
+| Powerups (red/green mushroom) | Same color | Distinguishable |
+| Level backgrounds | Similar | Unique per world |
+| File size | Smaller | 3× larger |
+
+For multi-level training, RGB provides crucial visual context that helps the agent identify which level it's in.
+
+## Hardware Requirements
+
+| Component | Minimum | Recommended (32 envs) |
+|-----------|---------|----------------------|
+| GPU VRAM | 4GB | 4GB (model is small) |
+| RAM | 32GB | 64GB |
+| CPU | 8 cores | 16+ cores |
+
+**Actual usage with 32 parallel environments:**
+- GPU: ~4GB VRAM, ~78% utilization
+- RAM: ~37GB stable, spikes to 64GB during updates
+- CPU: ~50% utilization
 
 ## Quick Start
 
@@ -127,7 +187,10 @@ pip install -r requirements.txt
 python test_env.py
 
 # Train agent (--env supports shorthand: '1-1' = 'SuperMarioBros-1-1-v0')
-python train_ppo.py --timesteps 10000000 --n-envs 16
+python train_ppo.py --timesteps 20000000 --n-envs 32
+
+# Multi-level training (recommended for generalization)
+python train_ppo.py --env "1-1,1-2" --timesteps 20000000 --n-envs 32
 
 # Watch trained agent play
 python train_ppo.py --mode play --model ./mario_models/1-1/best/best_model.zip --slow
@@ -159,7 +222,8 @@ Mario/
 ├── train_ppo.py        # Main training and inference script
 ├── record_video.py     # Record gameplay as GIF/MP4/WebP
 ├── wrappers.py         # Custom environment wrappers
-├── callbacks.py        # Training callbacks (collapse detection)
+├── callbacks.py        # Training callbacks (collapse detection, entropy decay)
+├── networks.py         # IMPALA CNN architecture
 ├── utils.py            # Utility functions
 ├── diagnose_policy.py  # Tool to analyze policy health
 ├── requirements.txt    # Python dependencies
@@ -173,12 +237,16 @@ Mario/
 
 Start a new training run:
 ```bash
-python train_ppo.py --timesteps 10000000 --n-envs 16
+# Single level
+python train_ppo.py --env 1-1 --timesteps 10000000 --n-envs 16
+
+# Multi-level (recommended)
+python train_ppo.py --env "1-1,1-2" --timesteps 20000000 --n-envs 32
 ```
 
 Resume from a checkpoint:
 ```bash
-python train_ppo.py --resume ./mario_models/1-1/checkpoints/.../checkpoint.zip --timesteps 20000000
+python train_ppo.py --resume ./mario_models/multi-1-1-1-2/checkpoints/.../checkpoint.zip --env "1-1,1-2" --timesteps 20000000
 ```
 
 ### Multi-Level Training
@@ -215,26 +283,40 @@ python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_m
 | `--mode` | `train` | `train` or `play` |
 | `--env` | `1-1` | Environment ID(s), supports shorthand (e.g., `1-1`, `1-1,1-2`) |
 | `--timesteps` | `2000000` | Total training timesteps |
-| `--n-envs` | `16` | Number of parallel environments |
+| `--n-envs` | `16` | Number of parallel environments (32 recommended for 64GB RAM) |
 | `--model` | `None` | Model path for play mode |
 | `--resume` | `None` | Checkpoint path to resume training |
 | `--lr` | `0.0001` | Learning rate |
-| `--ent-coef` | `0.05` | Entropy coefficient (higher = more exploration) |
+| `--ent-coef` | `0.08` | Initial entropy coefficient (decays to 0.01 automatically) |
+| `--n-steps` | `4096` | Steps per environment per update |
+| `--batch-size` | `256` | Minibatch size for PPO updates |
 | `--slow` | `False` | Slow down playback for viewing |
 
 ## PPO Hyperparameters
 
 ```python
-n_steps = 2048          # Steps per environment per update
-batch_size = 512        # Minibatch size
+# Environment
+observation_shape = (12, 120, 128)  # 4 RGB frames stacked (channels-first)
+action_space = 12                    # COMPLEX_MOVEMENT
+
+# PPO
+n_steps = 4096          # Steps per environment per update
+batch_size = 256        # Minibatch size
 n_epochs = 10           # Epochs per update
 gamma = 0.99            # Discount factor
 gae_lambda = 0.95       # GAE lambda
 clip_range = 0.2        # PPO clipping parameter
-ent_coef = 0.05         # Entropy coefficient
+ent_coef = 0.08 → 0.01  # Entropy coefficient (linear decay)
 vf_coef = 0.5           # Value function coefficient
 max_grad_norm = 0.5     # Gradient clipping
 learning_rate = 1e-4    # With linear decay
+
+# Network
+cnn = "IMPALA"          # Residual CNN
+stage_depths = (16, 32, 32)
+cnn_output_dim = 512
+policy_net = [256, 256]
+value_net = [256, 256]
 ```
 
 ## Custom Reward Shaping
@@ -251,13 +333,17 @@ learning_rate = 1e-4    # With linear decay
 
 ## Training Progress
 
-| Steps | Expected Behavior |
-|-------|-------------------|
-| 0-500K | Random exploration, learns to move right |
-| 500K-2M | Starts avoiding basic obstacles |
-| 2M-5M | Learns to jump over pipes and gaps |
-| 5M-10M | Can complete level 1-1 occasionally |
-| 10M+ | Consistent level completion |
+Expected behavior for multi-level training (1-1 + 1-2):
+
+| Steps | Expected Behavior | Entropy |
+|-------|-------------------|---------|
+| 0-1M | Random exploration, learns to move right | 0.08 → 0.07 |
+| 1-3M | Starts avoiding basic obstacles | 0.07 → 0.05 |
+| 3-7M | Learns to jump over pipes and gaps | 0.05 → 0.03 |
+| 7-12M | Can complete levels occasionally | 0.03 → 0.02 |
+| 12-20M | Consistent level completion, fine-tuning | 0.02 → 0.01 |
+
+**Training speed:** ~672 steps/sec with 32 envs on RTX 5090 (~8 hours for 20M steps)
 
 ## Troubleshooting
 
@@ -267,8 +353,21 @@ If Mario stops moving or always takes the same action:
 2. Find healthy checkpoint: `python diagnose_policy.py --find-healthy`
 3. Resume from it: `python train_ppo.py --resume HEALTHY_CHECKPOINT`
 
+The `PolicyCollapseCallback` automatically detects and recovers from collapse during training.
+
+### Out of Memory (RAM)
+If training crashes or system becomes unresponsive:
+- Reduce `--n-envs` (16 uses ~20GB, 32 uses ~40GB)
+- Reduce `--n-steps` (2048 instead of 4096 halves buffer size)
+
 ### Training Freezes
 The `PolicyCollapseCallback` was fixed to avoid deadlocks with `SubprocVecEnv`. If you experience freezes, ensure you have the latest version.
+
+### Multi-Level Forgetting
+If agent performs well on one level but forgets the other:
+- Increase `--ent-coef` to 0.1 for more exploration
+- Ensure equal distribution of envs across levels (automatic with round-robin)
+- Check TensorBoard for per-level metrics
 
 ## License
 

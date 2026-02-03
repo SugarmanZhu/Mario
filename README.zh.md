@@ -16,21 +16,21 @@
 
 ---
 
-一个使用 **近端策略优化 (PPO)** 学习玩超级马里奥兄弟的强化学习智能体。这是我之前基于DQN的马里奥智能体的重新实现，现在使用PPO以获得更好的稳定性和样本效率。
+一个使用 **近端策略优化 (PPO)** 学习玩超级马里奥兄弟的强化学习智能体。这是我之前基于DQN的马里奥智能体的重新实现，现在使用PPO以获得更好的稳定性和样本效率。v2.0 引入了 **IMPALA CNN** 架构和 **RGB 观测**，实现稳健的多关卡训练。
 
 ## 版本兼容性
 
 > [!WARNING]
-> **v2.0.0 破坏性更新**
+> **破坏性更新**
 >
-> | 版本 | 动作空间 | 动作数 | 兼容模型 |
-> |------|---------|--------|----------|
-> | v1.x | SIMPLE_MOVEMENT | 7 | 仅v1.x |
-> | v2.x | COMPLEX_MOVEMENT | 12 | 仅v2.x |
+> | 版本 | 观测 | CNN | 动作空间 | 兼容模型 |
+> |------|------|-----|---------|----------|
+> | v1.x | 84×84 灰度 | NatureCNN | 7个动作 | 仅v1.x |
+> | v2.x | 128×120 RGB | IMPALA | 12个动作 | 仅v2.x |
 >
-> **v1.x 和 v2.x 的模型不兼容**，因为动作空间大小不同。
+> **不同主版本的模型不兼容**，因为架构不同。
 >
-> v2.0 新增了 `down`（进入水管）、`up`（爬藤蔓）以及完整的向左移动动作。
+> - v2.0: 新增 `down`（进入水管）、`up`（爬藤蔓）、完整的向左移动动作、RGB观测、IMPALA CNN、用于多关卡训练的熵衰减
 
 ## 训练好的模型
 
@@ -46,7 +46,7 @@
 ## 动作空间
 
 <details>
-<summary><b>v2.x - COMPLEX_MOVEMENT (12个动作)</b> - 当前版本</summary>
+<summary><b>v2.x/v3.x - COMPLEX_MOVEMENT (12个动作)</b> - 当前版本</summary>
 
 | # | 动作 | 描述 |
 |---|------|------|
@@ -92,18 +92,78 @@
 ## 特性
 
 - **多关卡训练**：同时在多个关卡上训练，防止灾难性遗忘
+- **IMPALA CNN架构**：约400万参数的残差CNN，更好的多任务学习
+- **RGB观测**：128×120 RGB（非灰度）- 智能体可以看到HUD文字、道具颜色、关卡背景
+- **熵衰减**：自动从0.08衰减到0.01，实现探索到利用的过渡
 - **并行训练**：使用 `SubprocVecEnv` 实现真正的多进程并行
+- **内存高效**：uint8观测配合即时归一化（32个环境约11GB滚动缓冲区）
 - **自动检查点**：每10万步保存模型，支持断点续训
 - **最佳模型追踪**：自动保存评估表现最好的模型
 - **TensorBoard集成**：实时训练可视化
 - **视频录制**：将游戏过程录制为 GIF/MP4/WebP
 - **策略崩溃检测**：自动检测并恢复
 
-## 使用的硬件
+## 架构 (v2.0)
 
-- **GPU**: NVIDIA GeForce RTX 5090 (32GB显存)
-- **内存**: 64GB
-- **系统**: Windows 11
+### 观测处理流程
+
+```
+NES帧 (256×240 RGB)
+    ↓
+缩放到 128×120 (半分辨率，保持宽高比)
+    ↓
+帧堆叠 (4帧)
+    ↓
+转置为通道优先 (12, 120, 128) uint8
+    ↓
+即时归一化为 float32 [0, 1] (仅GPU)
+```
+
+### IMPALA CNN
+
+```
+输入: (12, 120, 128) - 4帧RGB堆叠
+    ↓
+阶段1: Conv3×3(12→16) → MaxPool3×3(s=2) → 2× ResBlock
+    ↓
+阶段2: Conv3×3(16→32) → MaxPool3×3(s=2) → 2× ResBlock
+    ↓
+阶段3: Conv3×3(32→32) → MaxPool3×3(s=2) → 2× ResBlock
+    ↓
+展平 → Linear(512) → ReLU
+    ↓
+策略头: Linear(256) → Linear(256) → 12个动作
+价值头: Linear(256) → Linear(256) → 1个价值
+```
+
+**为什么选择IMPALA而不是NatureCNN？**
+- 残差连接防止梯度消失
+- 更好的多任务学习（可以通过视觉区分关卡）
+- 约400万参数（与NatureCNN相近）
+
+### 为什么选择RGB而不是灰度？
+
+| 特征 | 灰度 | RGB |
+|------|------|-----|
+| HUD文字 ("WORLD 1-1") | 难以辨认 | 清晰 |
+| 道具 (红/绿蘑菇) | 颜色相同 | 可区分 |
+| 关卡背景 | 相似 | 每个世界独特 |
+| 文件大小 | 更小 | 大3倍 |
+
+对于多关卡训练，RGB提供关键的视觉上下文，帮助智能体识别当前关卡。
+
+## 硬件要求
+
+| 组件 | 最低 | 推荐 (32个环境) |
+|------|------|----------------|
+| GPU显存 | 4GB | 4GB (模型很小) |
+| 内存 | 32GB | 64GB |
+| CPU | 8核 | 16+核 |
+
+**32个并行环境的实际使用情况：**
+- GPU: ~4GB显存，~78%利用率
+- 内存: 稳定~37GB，更新时峰值64GB
+- CPU: ~50%利用率
 
 ## 快速开始
 
@@ -127,7 +187,10 @@ pip install -r requirements.txt
 python test_env.py
 
 # 训练智能体（--env 支持简写：'1-1' = 'SuperMarioBros-1-1-v0'）
-python train_ppo.py --timesteps 10000000 --n-envs 16
+python train_ppo.py --timesteps 20000000 --n-envs 32
+
+# 多关卡训练（推荐用于泛化）
+python train_ppo.py --env "1-1,1-2" --timesteps 20000000 --n-envs 32
 
 # 观看训练好的智能体游玩
 python train_ppo.py --mode play --model ./mario_models/1-1/best/best_model.zip --slow
@@ -159,7 +222,8 @@ Mario/
 ├── train_ppo.py        # 主训练和推理脚本
 ├── record_video.py     # 录制游戏为 GIF/MP4/WebP
 ├── wrappers.py         # 自定义环境包装器
-├── callbacks.py        # 训练回调（崩溃检测）
+├── callbacks.py        # 训练回调（崩溃检测、熵衰减）
+├── networks.py         # IMPALA CNN架构
 ├── utils.py            # 工具函数
 ├── diagnose_policy.py  # 策略健康分析工具
 ├── requirements.txt    # Python依赖
@@ -173,12 +237,16 @@ Mario/
 
 开始新的训练：
 ```bash
-python train_ppo.py --timesteps 10000000 --n-envs 16
+# 单关卡
+python train_ppo.py --env 1-1 --timesteps 10000000 --n-envs 16
+
+# 多关卡（推荐）
+python train_ppo.py --env "1-1,1-2" --timesteps 20000000 --n-envs 32
 ```
 
 从检查点恢复：
 ```bash
-python train_ppo.py --resume ./mario_models/1-1/checkpoints/.../checkpoint.zip --timesteps 20000000
+python train_ppo.py --resume ./mario_models/multi-1-1-1-2/checkpoints/.../checkpoint.zip --env "1-1,1-2" --timesteps 20000000
 ```
 
 ### 多关卡训练
@@ -215,26 +283,40 @@ python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_m
 | `--mode` | `train` | `train` 或 `play` |
 | `--env` | `1-1` | 环境ID，支持简写（如 `1-1`、`1-1,1-2`） |
 | `--timesteps` | `2000000` | 总训练步数 |
-| `--n-envs` | `16` | 并行环境数 |
+| `--n-envs` | `16` | 并行环境数（64GB内存推荐32） |
 | `--model` | `None` | 游玩模式的模型路径 |
 | `--resume` | `None` | 恢复训练的检查点路径 |
 | `--lr` | `0.0001` | 学习率 |
-| `--ent-coef` | `0.05` | 熵系数（越高探索越多） |
+| `--ent-coef` | `0.08` | 初始熵系数（自动衰减到0.01） |
+| `--n-steps` | `4096` | 每个环境每次更新的步数 |
+| `--batch-size` | `256` | PPO更新的小批量大小 |
 | `--slow` | `False` | 减慢播放速度便于观看 |
 
 ## PPO超参数
 
 ```python
-n_steps = 2048          # 每个环境每次更新的步数
-batch_size = 512        # 小批量大小
+# 环境
+observation_shape = (12, 120, 128)  # 4帧RGB堆叠（通道优先）
+action_space = 12                    # COMPLEX_MOVEMENT
+
+# PPO
+n_steps = 4096          # 每个环境每次更新的步数
+batch_size = 256        # 小批量大小
 n_epochs = 10           # 每次更新的轮数
 gamma = 0.99            # 折扣因子
 gae_lambda = 0.95       # GAE lambda
 clip_range = 0.2        # PPO裁剪参数
-ent_coef = 0.05         # 熵系数
+ent_coef = 0.08 → 0.01  # 熵系数（线性衰减）
 vf_coef = 0.5           # 价值函数系数
 max_grad_norm = 0.5     # 梯度裁剪
 learning_rate = 1e-4    # 使用线性衰减
+
+# 网络
+cnn = "IMPALA"          # 残差CNN
+stage_depths = (16, 32, 32)
+cnn_output_dim = 512
+policy_net = [256, 256]
+value_net = [256, 256]
 ```
 
 ## 自定义奖励塑形
@@ -251,13 +333,17 @@ learning_rate = 1e-4    # 使用线性衰减
 
 ## 训练进度
 
-| 步数 | 预期行为 |
-|------|---------|
-| 0-50万 | 随机探索，学习向右移动 |
-| 50万-200万 | 开始躲避基本障碍 |
-| 200万-500万 | 学会跳过水管和缺口 |
-| 500万-1000万 | 偶尔能通关1-1 |
-| 1000万+ | 稳定通关 |
+多关卡训练 (1-1 + 1-2) 的预期行为：
+
+| 步数 | 预期行为 | 熵 |
+|------|---------|-----|
+| 0-100万 | 随机探索，学习向右移动 | 0.08 → 0.07 |
+| 100万-300万 | 开始躲避基本障碍 | 0.07 → 0.05 |
+| 300万-700万 | 学会跳过水管和缺口 | 0.05 → 0.03 |
+| 700万-1200万 | 偶尔能通关 | 0.03 → 0.02 |
+| 1200万-2000万 | 稳定通关，精细调整 | 0.02 → 0.01 |
+
+**训练速度：** 在RTX 5090上使用32个环境约672步/秒（2000万步约8小时）
 
 ## 故障排除
 
@@ -267,8 +353,21 @@ learning_rate = 1e-4    # 使用线性衰减
 2. 查找健康检查点：`python diagnose_policy.py --find-healthy`
 3. 从健康检查点恢复：`python train_ppo.py --resume 健康检查点`
 
+`PolicyCollapseCallback` 在训练过程中会自动检测并从崩溃中恢复。
+
+### 内存不足 (RAM)
+如果训练崩溃或系统无响应：
+- 减少 `--n-envs`（16个约20GB，32个约40GB）
+- 减少 `--n-steps`（2048代替4096可将缓冲区大小减半）
+
 ### 训练卡住
 `PolicyCollapseCallback` 已修复以避免与 `SubprocVecEnv` 的死锁。如果遇到卡住问题，请确保使用最新版本。
+
+### 多关卡遗忘
+如果智能体在一个关卡表现良好但忘记了另一个：
+- 将 `--ent-coef` 增加到0.1以增加探索
+- 确保环境在各关卡间均匀分布（轮询自动实现）
+- 检查TensorBoard中的每关卡指标
 
 ## 许可证
 
