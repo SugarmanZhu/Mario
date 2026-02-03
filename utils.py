@@ -32,7 +32,9 @@ def compute_policy_health(action_counts: dict, n_actions: int) -> dict:
         }
 
     # Build probability array
-    action_probs = np.array([action_counts.get(i, 0) / total for i in range(n_actions)])
+    action_probs = np.array(
+        [action_counts.get(i, 0) / total for i in range(n_actions)], dtype=np.float32
+    )
 
     # Find dominant action
     dominant_action = int(np.argmax(action_probs))
@@ -40,7 +42,8 @@ def compute_policy_health(action_counts: dict, n_actions: int) -> dict:
 
     # Compute entropy: -sum(p * log(p))
     eps = 1e-8
-    entropy = float(-np.sum(action_probs * np.log(action_probs + eps)))
+    entropy_value = np.sum(action_probs * np.log(action_probs + eps))
+    entropy = float(-1.0 * entropy_value)
 
     # Check for collapse (>85% one action or entropy < 0.3)
     is_collapsed = dominant_ratio > 0.85 or entropy < 0.3
@@ -66,7 +69,23 @@ def linear_schedule(initial_value: float):
     return func
 
 
-def make_env(env_id, render_mode=None, use_reward_shaping=True):
+def ent_coef_schedule(initial_value: float, final_value: float = 0.01):
+    """
+    Linear entropy coefficient schedule.
+    Decays from initial_value to final_value over training.
+    """
+
+    def func(progress_remaining: float) -> float:
+        return final_value + (initial_value - final_value) * progress_remaining
+
+    return func
+
+
+def make_env(
+    env_id,
+    render_mode=None,
+    use_reward_shaping=True,
+):
     """
     Create a single preprocessed environment.
     Used for vectorized environments.
@@ -84,9 +103,9 @@ def make_env(env_id, render_mode=None, use_reward_shaping=True):
             env_id=env_id,
             actions="complex",  # 12 actions (includes down for pipes, up for vines)
             skip_frames=4,
-            resize_shape=84,
-            grayscale=True,
-            normalize=True,
+            resize_shape=(128, 120),  # Half native res, preserves aspect ratio
+            grayscale=False,  # Keep RGB: color carries information (powerups, level type)
+            normalize=False,  # Keep uint8 for memory efficiency, SB3 normalizes on-the-fly
             stack_frames=4,
             render_mode=render_mode,
             use_reward_shaping=use_reward_shaping,
@@ -193,9 +212,9 @@ def play(model_path, env_id="1-1", render=True, slow=False):
             env_id=current_env_id,
             actions="complex",
             skip_frames=4,
-            resize_shape=84,
-            grayscale=True,
-            normalize=True,
+            resize_shape=(128, 120),  # Half native res, preserves aspect ratio
+            grayscale=False,  # Keep RGB
+            normalize=False,  # Keep uint8, SB3 normalizes on-the-fly
             stack_frames=4,
             render_mode=render_mode,
             use_reward_shaping=False,  # Don't need reward shaping for play mode
