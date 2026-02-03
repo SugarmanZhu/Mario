@@ -12,8 +12,10 @@ import time
 from datetime import datetime
 
 from callbacks import PolicyCollapseCallback, ProgressTrackingCallback
+from networks import get_policy_kwargs
 from utils import (
     linear_schedule,
+    ent_coef_schedule,
     make_env,
     get_level_from_env_id,
     play,
@@ -115,7 +117,8 @@ def train(
     # Distribute environments across workers
     if is_multi_env:
         # Round-robin assignment of levels to workers
-        env_fns = [make_env(env_ids[i % len(env_ids)]) for i in range(n_envs)]
+        num_levels = len(env_ids)
+        env_fns = [make_env(env_ids[i % num_levels]) for i in range(n_envs)]
         print(f"  Environment distribution:")
         for i, eid in enumerate(env_ids):
             count = sum(1 for j in range(n_envs) if env_ids[j % len(env_ids)] == eid)
@@ -155,15 +158,17 @@ def train(
         )
         # Update hyperparameters for resumed training
         model.learning_rate = lr
-        model.ent_coef = ent_coef
+        model.ent_coef = ent_coef_schedule(ent_coef, 0.01)
         print(f"Resumed! Previous timesteps: {model.num_timesteps:,}")
         print(f"Entropy coefficient: {model.ent_coef}")
     else:
         print("\nCreating new PPO model...")
-        # Policy kwargs to handle normalized images
-        policy_kwargs = dict(
-            normalize_images=False  # We already normalized to [0, 1]
-        )
+        # Get policy kwargs - always use IMPALA CNN
+        policy_kwargs = get_policy_kwargs()
+        # Observations are uint8 [0-255], let SB3 normalize to float32 [0-1] on-the-fly
+        # This saves memory: rollout buffer stores uint8, only batch is converted to float32
+        policy_kwargs["normalize_images"] = True
+
         model = PPO(
             policy="CnnPolicy",
             env=train_env,
@@ -175,7 +180,9 @@ def train(
             gae_lambda=0.95,  # GAE lambda
             clip_range=0.2,  # PPO clip range
             clip_range_vf=None,  # Value function clip (None = no clipping)
-            ent_coef=ent_coef,  # Entropy coefficient for exploration
+            ent_coef=ent_coef_schedule(
+                ent_coef, 0.01
+            ),  # Entropy coefficient with decay
             vf_coef=0.5,  # Value function coefficient
             max_grad_norm=0.5,  # Gradient clipping
             verbose=1,
