@@ -11,7 +11,7 @@ import os
 import time
 from datetime import datetime
 
-from callbacks import PolicyCollapseCallback
+from callbacks import PolicyCollapseCallback, ProgressTrackingCallback
 from utils import (
     linear_schedule,
     make_env,
@@ -31,7 +31,9 @@ def train(
     learning_rate=1e-4,
     use_lr_schedule=True,
     resume_from=None,
-    ent_coef=0.05,
+    ent_coef=0.08,
+    n_steps=4096,
+    batch_size=256,
 ):
     """
     Train PPO agent on Super Mario Bros.
@@ -46,7 +48,9 @@ def train(
         learning_rate: Initial learning rate
         use_lr_schedule: Whether to use linear LR decay
         resume_from: Path to model checkpoint to resume from (optional)
-        ent_coef: Entropy coefficient (higher = more exploration)
+        ent_coef: Entropy coefficient (higher = more exploration, default: 0.08)
+        n_steps: Steps per environment per update (default: 4096)
+        batch_size: Batch size for PPO updates (default: 256)
     """
     from stable_baselines3 import PPO
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
@@ -164,8 +168,8 @@ def train(
             policy="CnnPolicy",
             env=train_env,
             learning_rate=lr,
-            n_steps=2048,  # Steps per environment per update
-            batch_size=512,  # Larger batch = better GPU utilization
+            n_steps=n_steps,
+            batch_size=batch_size,
             n_epochs=10,  # Number of epochs per update
             gamma=0.99,  # Discount factor
             gae_lambda=0.95,  # GAE lambda
@@ -213,7 +217,15 @@ def train(
         verbose=1,
     )
 
-    callbacks = CallbackList([checkpoint_callback, eval_callback, collapse_callback])
+    # Episode-level progress tracking callback
+    progress_callback = ProgressTrackingCallback(
+        check_freq=10_000,  # Log every 10k steps
+        verbose=1,
+    )
+
+    callbacks = CallbackList(
+        [checkpoint_callback, eval_callback, collapse_callback, progress_callback]
+    )
 
     # Train!
     print("\n" + "=" * 60)
@@ -302,8 +314,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "--ent-coef",
         type=float,
-        default=0.05,
-        help="Entropy coefficient (higher = more exploration, default: 0.05)",
+        default=0.08,
+        help="Entropy coefficient (higher = more exploration, default: 0.08)",
+    )
+    parser.add_argument(
+        "--n-steps",
+        type=int,
+        default=4096,
+        help="Steps per environment per update (default: 4096)",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=256,
+        help="Batch size for PPO updates (default: 256)",
     )
     parser.add_argument(
         "--slow",
@@ -321,6 +345,8 @@ if __name__ == "__main__":
             learning_rate=args.lr,
             resume_from=args.resume,
             ent_coef=args.ent_coef,
+            n_steps=args.n_steps,
+            batch_size=args.batch_size,
         )
     else:
         if args.model is None:

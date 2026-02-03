@@ -171,9 +171,9 @@ class CustomRewardWrapper(gym.Wrapper):
         self,
         env,
         forward_reward_scale=0.1,
-        death_penalty=-50,
+        death_penalty=-15,
         stuck_penalty=-0.5,
-        flag_bonus=100,
+        flag_bonus=200,
         time_penalty=-0.01,
         score_reward_scale=0.01,
         coin_bonus=5.0,
@@ -184,6 +184,8 @@ class CustomRewardWrapper(gym.Wrapper):
         self._prev_score = 0
         self._prev_coins = 0
         self._stuck_counter = 0
+        self._max_x_pos = 0
+        self._reached_milestones = set()
 
         # Reward shaping parameters
         self.forward_reward_scale = forward_reward_scale
@@ -203,10 +205,12 @@ class CustomRewardWrapper(gym.Wrapper):
             info = {}
 
         self._prev_x_pos = info.get("x_pos", 0)
+        self._max_x_pos = info.get("x_pos", 0)
         self._prev_time = info.get("time", 400)
         self._prev_score = info.get("score", 0)
         self._prev_coins = info.get("coins", 0)
         self._stuck_counter = 0
+        self._reached_milestones = set()
         return obs, info
 
     def step(self, action):
@@ -222,11 +226,27 @@ class CustomRewardWrapper(gym.Wrapper):
         # Calculate shaped reward
         shaped_reward = 0
 
-        # 1. Forward progress reward (most important!)
-        x_delta = x_pos - self._prev_x_pos
-        shaped_reward += x_delta * self.forward_reward_scale
+        # 1. Forward progress reward - only reward NEW maximum territory
+        if x_pos > self._max_x_pos:
+            progress_reward = (x_pos - self._max_x_pos) * self.forward_reward_scale
+            # Apply progressive multiplier: more valuable as Mario progresses
+            progress_multiplier = 1 + (x_pos / 3000)
+            progress_reward *= progress_multiplier
+            shaped_reward += progress_reward
+            self._max_x_pos = x_pos
+        else:
+            # No penalty for backtracking, just no reward
+            pass
 
-        # 2. Stuck penalty - if Mario hasn't moved in a while
+        # 2. Milestone bonuses - one-time bonus for reaching key x positions
+        milestone_positions = [500, 1000, 1500, 2000, 2500, 3000]
+        for milestone in milestone_positions:
+            if x_pos >= milestone and milestone not in self._reached_milestones:
+                shaped_reward += 25
+                self._reached_milestones.add(milestone)
+
+        # 3. Stuck penalty - if Mario hasn't moved in a while
+        x_delta = x_pos - self._prev_x_pos
         if x_delta <= 0:
             self._stuck_counter += 1
             if self._stuck_counter > 10:  # Stuck for 10+ frames
@@ -234,23 +254,23 @@ class CustomRewardWrapper(gym.Wrapper):
         else:
             self._stuck_counter = 0
 
-        # 3. Time pressure - small penalty for time passing
+        # 4. Time pressure - small penalty for time passing
         shaped_reward += self.time_penalty
 
-        # 4. Flag bonus
+        # 5. Flag bonus
         if flag_get:
             shaped_reward += self.flag_bonus
 
-        # 5. Death penalty
+        # 6. Death penalty
         if done and not flag_get:
             shaped_reward += self.death_penalty
 
-        # 6. Score increase reward (killing enemies, collecting power-ups, etc.)
+        # 7. Score increase reward (killing enemies, collecting power-ups, etc.)
         score_delta = score - self._prev_score
         if score_delta > 0:
             shaped_reward += score_delta * self.score_reward_scale
 
-        # 7. Coin bonus
+        # 8. Coin bonus
         coin_delta = coins - self._prev_coins
         if coin_delta > 0:
             shaped_reward += coin_delta * self.coin_bonus
