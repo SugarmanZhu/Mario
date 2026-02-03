@@ -11,11 +11,14 @@ import os
 import time
 from datetime import datetime
 
-from callbacks import PolicyCollapseCallback, ProgressTrackingCallback
+from callbacks import (
+    PolicyCollapseCallback,
+    ProgressTrackingCallback,
+    EntropyDecayCallback,
+)
 from networks import get_policy_kwargs
 from utils import (
     linear_schedule,
-    ent_coef_schedule,
     make_env,
     get_level_from_env_id,
     play,
@@ -158,9 +161,11 @@ def train(
         )
         # Update hyperparameters for resumed training
         model.learning_rate = lr
-        model.ent_coef = ent_coef_schedule(ent_coef, 0.01)
+        model.ent_coef = (
+            ent_coef  # Initial value, will be decayed by EntropyDecayCallback
+        )
         print(f"Resumed! Previous timesteps: {model.num_timesteps:,}")
-        print(f"Entropy coefficient: {model.ent_coef}")
+        print(f"Entropy coefficient: {model.ent_coef} (will decay to 0.01)")
     else:
         print("\nCreating new PPO model...")
         # Get policy kwargs - always use IMPALA CNN
@@ -180,9 +185,7 @@ def train(
             gae_lambda=0.95,  # GAE lambda
             clip_range=0.2,  # PPO clip range
             clip_range_vf=None,  # Value function clip (None = no clipping)
-            ent_coef=ent_coef_schedule(
-                ent_coef, 0.01
-            ),  # Entropy coefficient with decay
+            ent_coef=ent_coef,  # Initial value, will be decayed by EntropyDecayCallback
             vf_coef=0.5,  # Value function coefficient
             max_grad_norm=0.5,  # Gradient clipping
             verbose=1,
@@ -230,8 +233,22 @@ def train(
         verbose=1,
     )
 
+    # Entropy coefficient decay callback (0.08 -> 0.01 over training)
+    entropy_decay_callback = EntropyDecayCallback(
+        initial_ent_coef=ent_coef,
+        final_ent_coef=0.01,
+        total_timesteps=total_timesteps,
+        verbose=1,
+    )
+
     callbacks = CallbackList(
-        [checkpoint_callback, eval_callback, collapse_callback, progress_callback]
+        [
+            checkpoint_callback,
+            eval_callback,
+            collapse_callback,
+            progress_callback,
+            entropy_decay_callback,
+        ]
     )
 
     # Train!
