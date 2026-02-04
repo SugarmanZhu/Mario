@@ -145,12 +145,11 @@ Value head: Linear(256) → Linear(256) → 1 value
 
 | Feature | Grayscale | RGB |
 |---------|-----------|-----|
-| HUD text ("WORLD 1-1") | Hard to read | Clear |
-| Powerups (red/green mushroom) | Same color | Distinguishable |
-| Level backgrounds | Similar | Unique per world |
-| File size | Smaller | 3× larger |
+| Powerups (red/green mushroom) | Same gray tone | Distinguishable |
+| Level identity (underground/water/castle) | Similar appearance | Unique color palettes |
+| Memory usage | 1 channel | 3 channels |
 
-For multi-level training, RGB provides crucial visual context that helps the agent identify which level it's in.
+For multi-level training, RGB provides crucial visual context that helps the agent distinguish powerup types and identify which level type it's in.
 
 ## Hardware Requirements
 
