@@ -123,8 +123,12 @@ def train(
         num_levels = len(env_ids)
         env_fns = [make_env(env_ids[i % num_levels]) for i in range(n_envs)]
         print(f"  Environment distribution:")
-        for i, eid in enumerate(env_ids):
-            count = sum(1 for j in range(n_envs) if env_ids[j % len(env_ids)] == eid)
+        # Count unique environments (handles duplicates like "1-1,1-2,1-2")
+        env_counts = {}
+        for j in range(n_envs):
+            eid = env_ids[j % len(env_ids)]
+            env_counts[eid] = env_counts.get(eid, 0) + 1
+        for eid, count in env_counts.items():
             print(f"    {eid}: {count} workers")
     else:
         env_fns = [make_env(env_ids[0]) for _ in range(n_envs)]
