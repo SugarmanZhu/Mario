@@ -284,6 +284,8 @@ class ProgressTrackingCallback(BaseCallback):
     - max_x_pos: Maximum x position reached in the level
     - flag_get: Whether the level was completed (flag reached)
     - episode_length: Number of steps taken in the episode
+    - episode_reward: Total reward for the episode
+    - reward_per_step: Average reward per step (episode_reward / episode_length)
 
     Uses a rolling window of the last 100 episodes to compute statistics.
     """
@@ -302,16 +304,20 @@ class ProgressTrackingCallback(BaseCallback):
         self.episode_max_x_pos: list = []
         self.episode_flag_get: list = []
         self.episode_lengths: list = []
+        self.episode_rewards: list = []
+        self.episode_reward_per_step: list = []
 
         # Track current episode per environment (initialized on first step)
         self.current_episode_max_x: Optional[np.ndarray] = None
         self.current_episode_length: Optional[np.ndarray] = None
+        self.current_episode_reward: Optional[np.ndarray] = None
 
     def _init_tracking(self) -> None:
         """Initialize tracking arrays for each environment."""
         n_envs = self.training_env.num_envs
         self.current_episode_max_x = np.zeros(n_envs, dtype=np.float32)
         self.current_episode_length = np.zeros(n_envs, dtype=np.int32)
+        self.current_episode_reward = np.zeros(n_envs, dtype=np.float32)
 
     def _on_step(self) -> bool:
         """Called after each step."""
@@ -337,6 +343,9 @@ class ProgressTrackingCallback(BaseCallback):
                 self.training_env, "infos", [{}] * self.training_env.num_envs
             )
 
+        # Get rewards from the rollout buffer or locals
+        rewards = self.locals.get("rewards", np.zeros(self.training_env.num_envs))
+
         # Update tracking for each environment
         for i in range(self.training_env.num_envs):
             info = infos[i] if i < len(infos) else {}
@@ -351,9 +360,11 @@ class ProgressTrackingCallback(BaseCallback):
                     self.current_episode_max_x[i], float(info.get("x_pos", 0))
                 )
 
-            # Increment step counter
+            # Accumulate reward and increment step counter
             if self.current_episode_length is not None:
                 self.current_episode_length[i] += 1
+            if self.current_episode_reward is not None and i < len(rewards):
+                self.current_episode_reward[i] += rewards[i]
 
             # Check if episode is done
             if i < len(dones) and dones[i]:
@@ -367,20 +378,30 @@ class ProgressTrackingCallback(BaseCallback):
                 if (
                     self.current_episode_max_x is not None
                     and self.current_episode_length is not None
+                    and self.current_episode_reward is not None
                 ):
+                    ep_len = int(self.current_episode_length[i])
+                    ep_reward = float(self.current_episode_reward[i])
+                    reward_per_step = ep_reward / max(ep_len, 1)
+
                     self.episode_max_x_pos.append(float(self.current_episode_max_x[i]))
                     self.episode_flag_get.append(1 if flag_get else 0)
-                    self.episode_lengths.append(int(self.current_episode_length[i]))
+                    self.episode_lengths.append(ep_len)
+                    self.episode_rewards.append(ep_reward)
+                    self.episode_reward_per_step.append(reward_per_step)
 
                     # Keep only last 100 episodes
                     if len(self.episode_max_x_pos) > self.max_window_size:
                         self.episode_max_x_pos.pop(0)
                         self.episode_flag_get.pop(0)
                         self.episode_lengths.pop(0)
+                        self.episode_rewards.pop(0)
+                        self.episode_reward_per_step.pop(0)
 
                     # Reset tracking for next episode
                     self.current_episode_max_x[i] = 0.0
                     self.current_episode_length[i] = 0
+                    self.current_episode_reward[i] = 0.0
 
         # Log statistics every check_freq steps
         if self.n_calls % self.check_freq == 0 and len(self.episode_max_x_pos) > 0:
@@ -389,11 +410,15 @@ class ProgressTrackingCallback(BaseCallback):
                 max_x_pos_mean = np.mean(self.episode_max_x_pos)
                 flag_get_rate = np.mean(self.episode_flag_get)
                 episode_length_mean = np.mean(self.episode_lengths)
+                episode_reward_mean = np.mean(self.episode_rewards)
+                reward_per_step_mean = np.mean(self.episode_reward_per_step)
 
                 # Log to TensorBoard
                 self.logger.record("progress/max_x_pos_mean", max_x_pos_mean)
                 self.logger.record("progress/flag_get_rate", flag_get_rate)
                 self.logger.record("progress/episode_length", episode_length_mean)
+                self.logger.record("progress/episode_reward", episode_reward_mean)
+                self.logger.record("progress/reward_per_step", reward_per_step_mean)
                 self.logger.record(
                     "progress/episodes_tracked", len(self.episode_max_x_pos)
                 )
@@ -403,6 +428,7 @@ class ProgressTrackingCallback(BaseCallback):
                     print(f"  Avg Max X Position: {max_x_pos_mean:.1f}")
                     print(f"  Flag Get Rate: {flag_get_rate * 100:.1f}%")
                     print(f"  Avg Episode Length: {episode_length_mean:.1f}")
+                    print(f"  Avg Reward/Step: {reward_per_step_mean:.3f}")
 
             except Exception as e:
                 if self.verbose > 0:
