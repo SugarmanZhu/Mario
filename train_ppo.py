@@ -146,13 +146,12 @@ def train(
         train_env = DummyVecEnv(env_fns)
 
     # Create evaluation environment
-    # For multi-level training, evaluate on all levels to detect forgetting
+    # For multi-level training, evaluate on each unique level once
     print("Creating evaluation environment...")
+    unique_env_ids = list(dict.fromkeys(env_ids))  # Dedupe while preserving order
+    eval_env = DummyVecEnv([make_env(eid) for eid in unique_env_ids])
     if is_multi_env:
-        eval_env = DummyVecEnv([make_env(eid) for eid in env_ids])
-        print(f"  Evaluating on {len(env_ids)} levels: {env_ids}")
-    else:
-        eval_env = DummyVecEnv([make_env(env_ids[0])])
+        print(f"  Evaluating on {len(unique_env_ids)} unique levels: {unique_env_ids}")
 
     # Setup learning rate
     lr = linear_schedule(learning_rate) if use_lr_schedule else learning_rate
@@ -215,7 +214,7 @@ def train(
         best_model_save_path=best_model_dir,
         log_path=os.path.join(level_log_dir, "eval"),
         eval_freq=50_000 // n_envs,
-        n_eval_episodes=5,
+        n_eval_episodes=len(unique_env_ids),  # One episode per unique level
         deterministic=True,
         render=False,
     )
