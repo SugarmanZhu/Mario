@@ -18,12 +18,15 @@ class EntropyDecayCallback(BaseCallback):
 
     SB3 doesn't support schedule functions for ent_coef (only for learning_rate),
     so we manually decay it using this callback.
+
+    NOTE: This callback tracks progress based on steps taken IN THIS RUN, not
+    cumulative model timesteps. This ensures correct decay when resuming training.
     """
 
     def __init__(
         self,
         initial_ent_coef: float = 0.08,
-        final_ent_coef: float = 0.01,
+        final_ent_coef: float = 0.03,
         total_timesteps: int = 20_000_000,
         verbose: int = 1,
     ):
@@ -31,18 +34,24 @@ class EntropyDecayCallback(BaseCallback):
         Args:
             initial_ent_coef: Starting entropy coefficient
             final_ent_coef: Final entropy coefficient at end of training
-            total_timesteps: Total expected training timesteps
+            total_timesteps: Total timesteps for THIS training run (not cumulative)
             verbose: Verbosity level
         """
         super().__init__(verbose)
         self.initial_ent_coef = initial_ent_coef
         self.final_ent_coef = final_ent_coef
         self.total_timesteps = total_timesteps
+        self._start_timesteps: int = 0  # Will be set on first step
+
+    def _on_training_start(self) -> None:
+        """Called at the start of training - record starting timesteps."""
+        self._start_timesteps = self.model.num_timesteps
 
     def _on_step(self) -> bool:
         """Called after each step - update entropy coefficient."""
-        # Calculate progress (0 to 1)
-        progress = min(1.0, self.num_timesteps / self.total_timesteps)
+        # Calculate progress based on steps in THIS run, not cumulative
+        steps_this_run = self.num_timesteps - self._start_timesteps
+        progress = min(1.0, steps_this_run / self.total_timesteps)
 
         # Linear decay from initial to final
         new_ent_coef = self.final_ent_coef + (
