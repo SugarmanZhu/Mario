@@ -213,7 +213,7 @@ def train(
         eval_env,
         best_model_save_path=best_model_dir,
         log_path=os.path.join(level_log_dir, "eval"),
-        eval_freq=50_000 // n_envs,
+        eval_freq=max(50_000 // n_envs, n_steps),
         n_eval_episodes=len(unique_env_ids),  # One episode per unique level
         deterministic=True,
         render=False,
