@@ -142,7 +142,7 @@ def find_healthy_checkpoint(model_dir, max_checkpoints=10, env_id="1-1"):
         name = os.path.basename(path)
         try:
             return int(name.split("_")[-2])
-        except:
+        except (ValueError, IndexError):
             return 0
 
     checkpoints = sorted(checkpoints, key=get_steps)
