@@ -51,7 +51,7 @@ class MarioImpalaExtractor(BaseFeaturesExtractor):
     """
     IMPALA-style CNN feature extractor for Mario training.
 
-    Accepts Box observation space (C, H, W) - e.g., (4, 160, 160) for stacked grayscale frames.
+    Accepts Box observation space (C, H, W) - e.g., (12, 120, 128) for 4 stacked RGB frames.
 
     Architecture:
         - 3 IMPALA stages with depths [16, 32, 32]
