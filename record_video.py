@@ -89,12 +89,14 @@ def record_episode(
 
         # Step both environments with the same action
         # We need to repeat the action 4 times for raw_env since wrapped env uses skip_frames=4
+        raw_died = False
         for _ in range(4):
             frame = raw_env.render()
             if frame is not None:
                 frames.append(frame.copy())
             raw_obs, _, raw_done, _, raw_info = raw_env.step(action)
             if raw_done:
+                raw_died = True
                 break
 
         # Step the wrapped environment once (it handles frame skip internally)
@@ -102,7 +104,7 @@ def record_episode(
         total_reward += reward
         steps += 1
 
-        if done or truncated:
+        if done or truncated or raw_died:
             break
 
     env.close()
