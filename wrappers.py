@@ -310,6 +310,15 @@ class CustomRewardWrapper(gym.Wrapper):
         self._prev_score = score
         self._prev_coins = coins
 
+        # Reset state for next episode (gym auto-resets without calling wrapper.reset())
+        if done or truncated:
+            self._prev_x_pos = 0
+            self._max_x_pos = 0
+            self._prev_time = 400
+            self._prev_score = 0
+            self._prev_coins = 0
+            self._stuck_counter = 0
+
         return obs, total_reward, done, truncated, info
 
 
