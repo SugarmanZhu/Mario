@@ -172,7 +172,7 @@ class PolicyCollapseCallback(BaseCallback):
         # This tests if the policy has collapsed to always choosing one action
         for _ in range(self.n_eval_samples):
             # Create random observations (batch of n_envs observations)
-            random_obs = np.random.rand(n_envs, *obs_shape).astype(np.float32)
+            random_obs = np.random.randint(0, 256, size=(n_envs, *obs_shape), dtype=np.uint8)
 
             # Get action from policy
             action, _ = self.model.predict(random_obs, deterministic=False)
