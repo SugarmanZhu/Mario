@@ -69,18 +69,6 @@ def linear_schedule(initial_value: float):
     return func
 
 
-def ent_coef_schedule(initial_value: float, final_value: float = 0.01):
-    """
-    Linear entropy coefficient schedule.
-    Decays from initial_value to final_value over training.
-    """
-
-    def func(progress_remaining: float) -> float:
-        return final_value + (initial_value - final_value) * progress_remaining
-
-    return func
-
-
 def make_env(
     env_id,
     render_mode=None,
