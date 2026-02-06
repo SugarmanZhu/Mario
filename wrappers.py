@@ -266,7 +266,7 @@ class CustomRewardWrapper(gym.Wrapper):
         if x_pos > self._max_x_pos:
             progress_reward = (x_pos - self._max_x_pos) * self.forward_reward_scale
             # Apply progressive multiplier: more valuable as Mario progresses
-            progress_multiplier = min(1 + (x_pos / 3000), 2.0)
+            progress_multiplier = min(1 + (x_pos / 3000), 2.5)
             progress_reward *= progress_multiplier
             shaped_reward += progress_reward
             self._max_x_pos = x_pos
