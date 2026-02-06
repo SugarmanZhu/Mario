@@ -4,6 +4,7 @@ Custom callbacks for PPO training.
 
 import os
 import glob
+from collections import deque
 from typing import Optional
 
 import numpy as np
@@ -301,11 +302,11 @@ class ProgressTrackingCallback(BaseCallback):
 
         # Rolling window storage (last 100 episodes)
         self.max_window_size = 100
-        self.episode_max_x_pos: list = []
-        self.episode_flag_get: list = []
-        self.episode_lengths: list = []
-        self.episode_rewards: list = []
-        self.episode_reward_per_step: list = []
+        self.episode_max_x_pos: deque = deque(maxlen=self.max_window_size)
+        self.episode_flag_get: deque = deque(maxlen=self.max_window_size)
+        self.episode_lengths: deque = deque(maxlen=self.max_window_size)
+        self.episode_rewards: deque = deque(maxlen=self.max_window_size)
+        self.episode_reward_per_step: deque = deque(maxlen=self.max_window_size)
 
         # Track current episode per environment (initialized on first step)
         self.current_episode_max_x: Optional[np.ndarray] = None
@@ -389,14 +390,6 @@ class ProgressTrackingCallback(BaseCallback):
                     self.episode_lengths.append(ep_len)
                     self.episode_rewards.append(ep_reward)
                     self.episode_reward_per_step.append(reward_per_step)
-
-                    # Keep only last 100 episodes
-                    if len(self.episode_max_x_pos) > self.max_window_size:
-                        self.episode_max_x_pos.pop(0)
-                        self.episode_flag_get.pop(0)
-                        self.episode_lengths.pop(0)
-                        self.episode_rewards.pop(0)
-                        self.episode_reward_per_step.pop(0)
 
                     # Reset tracking for next episode
                     self.current_episode_max_x[i] = 0.0
