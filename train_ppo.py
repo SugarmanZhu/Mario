@@ -29,16 +29,16 @@ from utils import (
 def train(
     env_id="1-1",
     total_timesteps=2_000_000,
-    n_envs=8,
+    n_envs=48,
     save_dir="./mario_models",
     log_dir="./mario_logs",
     checkpoint_freq=100_000,
-    learning_rate=1e-4,
+    learning_rate=2.5e-4,
     use_lr_schedule=True,
     resume_from=None,
     ent_coef=0.08,
     n_steps=4096,
-    batch_size=256,
+    batch_size=1024,
 ):
     """
     Train PPO agent on Super Mario Bros.
@@ -322,8 +322,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n-envs",
         type=int,
-        default=16,
-        help="Number of parallel environments (default: 16 for RTX 5090)",
+        default=48,
+        help="Number of parallel environments (default: 48 for RTX 5090)",
     )
     parser.add_argument(
         "--model",
@@ -337,7 +337,7 @@ if __name__ == "__main__":
         default=None,
         help="Path to checkpoint to resume training from",
     )
-    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=2.5e-4, help="Learning rate")
     parser.add_argument(
         "--ent-coef",
         type=float,
@@ -353,8 +353,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=256,
-        help="Batch size for PPO updates (default: 256)",
+        default=1024,
+        help="Batch size for PPO updates (default: 1024)",
     )
     parser.add_argument(
         "--slow",
