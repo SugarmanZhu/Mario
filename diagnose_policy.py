@@ -12,7 +12,7 @@ import suppress_warnings  # noqa: F401
 import os
 from glob import glob
 
-from utils import compute_policy_health, normalize_env_id
+from utils import compute_policy_health, get_level_from_env_id, normalize_env_id
 
 
 def analyze_model_actions(model_path, env, n_steps=500, deterministic=True):
@@ -218,7 +218,7 @@ if __name__ == "__main__":
         "--model-dir",
         type=str,
         default="./mario_models",
-        help="Directory containing model checkpoints",
+        help="Root model directory (level subdir derived from --env)",
     )
     parser.add_argument(
         "--render", action="store_true", help="Render the game while diagnosing"
@@ -232,13 +232,18 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Build the level-specific model directory that matches the training layout:
+    # {model_dir}/{level}/checkpoints/... and {model_dir}/{level}/best/
+    level = get_level_from_env_id(normalize_env_id(args.env))
+    level_model_dir = os.path.join(args.model_dir, level)
+
     if args.model:
         diagnose_single_model(args.model, render=args.render, env_id=args.env)
     elif args.find_healthy:
-        find_healthy_checkpoint(args.model_dir, env_id=args.env)
+        find_healthy_checkpoint(level_model_dir, env_id=args.env)
     else:
         # Default: diagnose best model
-        best_model = os.path.join(args.model_dir, "best", "best_model.zip")
+        best_model = os.path.join(level_model_dir, "best", "best_model.zip")
         if os.path.exists(best_model):
             diagnose_single_model(best_model, render=args.render, env_id=args.env)
         else:
