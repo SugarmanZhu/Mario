@@ -2,6 +2,8 @@
 Utility functions for Mario PPO training.
 """
 
+from __future__ import annotations
+
 import numpy as np
 
 
