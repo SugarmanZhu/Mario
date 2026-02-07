@@ -123,7 +123,7 @@ class FrameStack(gym.Wrapper):
             info = {}
 
         # Initialize frame stack with copies of first observation
-        self.frames = [obs] * self.n_frames
+        self.frames = [obs.copy() for _ in range(self.n_frames)]
         stacked = np.concatenate(self.frames, axis=-1)
         return stacked, info
 
@@ -132,7 +132,7 @@ class FrameStack(gym.Wrapper):
 
         # Update frame stack
         self.frames.pop(0)
-        self.frames.append(obs)
+        self.frames.append(obs.copy())
         stacked = np.concatenate(self.frames, axis=-1)
 
         return stacked, reward, done, truncated, info
