@@ -5,6 +5,8 @@ These handle preprocessing for RL training with PPO.
 
 import suppress_warnings  # noqa: F401 - must be first to suppress gym warnings
 
+from collections import deque
+
 import gym
 import numpy as np
 from gym import spaces
@@ -98,7 +100,7 @@ class FrameStack(gym.Wrapper):
     def __init__(self, env, n_frames=4):
         super().__init__(env)
         self.n_frames = n_frames
-        self.frames = None
+        self.frames = deque(maxlen=n_frames)
 
         # Update observation space
         obs_shape = env.observation_space.shape
@@ -122,16 +124,17 @@ class FrameStack(gym.Wrapper):
             obs = result
             info = {}
 
-        # Initialize frame stack with copies of first observation
-        self.frames = [obs] * self.n_frames
+        # Initialize frame stack with first observation
+        self.frames.clear()
+        for _ in range(self.n_frames):
+            self.frames.append(obs)
         stacked = np.concatenate(self.frames, axis=-1)
         return stacked, info
 
     def step(self, action):
         obs, reward, done, truncated, info = self.env.step(action)
 
-        # Update frame stack
-        self.frames.pop(0)
+        # Update frame stack (deque maxlen auto-discards oldest)
         self.frames.append(obs)
         stacked = np.concatenate(self.frames, axis=-1)
 
