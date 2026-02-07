@@ -131,7 +131,7 @@ def find_healthy_checkpoint(model_dir, max_checkpoints=10, env_id="1-1"):
     # Normalize env_id (support shorthand)
     env_id = normalize_env_id(env_id)
 
-    checkpoints = sorted(glob(os.path.join(model_dir, "*_steps.zip")))
+    checkpoints = sorted(glob(os.path.join(model_dir, "**", "*_steps.zip"), recursive=True))
 
     if not checkpoints:
         print("No checkpoints found!")
