@@ -54,7 +54,7 @@ class MarioImpalaExtractor(BaseFeaturesExtractor):
     Accepts Box observation space (C, H, W) - e.g., (12, 120, 128) for 4 stacked RGB frames.
 
     Architecture:
-        - 3 IMPALA stages with depths [16, 32, 32]
+        - 3 IMPALA stages with depths [64, 128, 128]
         - Each stage: Conv3x3 -> MaxPool3x3(s=2) -> 2x ResBlock
         - Flatten -> Linear -> ReLU (features)
 
@@ -155,7 +155,7 @@ def get_policy_kwargs() -> dict:
         features_extractor_class=MarioImpalaExtractor,
         features_extractor_kwargs=dict(
             cnn_output_dim=512,
-            stage_depths=(16, 32, 32),
+            stage_depths=(64, 128, 128),
         ),
         net_arch=dict(pi=[256, 256], vf=[256, 256]),
         activation_fn=nn.ReLU,
