@@ -92,7 +92,7 @@ A reinforcement learning agent that learns to play Super Mario Bros using **Prox
 ## Features
 
 - **Multi-Level Training**: Train on multiple levels simultaneously without catastrophic forgetting
-- **IMPALA CNN Architecture**: Residual CNN with ~18M parameters for better multi-task learning
+- **IMPALA CNN Architecture**: Residual CNN with ~8M parameters for better multi-task learning
 - **RGB Observations**: 128×120 RGB (not grayscale) - agent can see HUD text, powerup colors, level backgrounds
 - **Entropy Decay**: Automatic decay from 0.08 → 0.01 for exploration-to-exploitation transition
 - **Parallel Training**: Uses `SubprocVecEnv` for true multi-process parallelism
@@ -124,11 +124,11 @@ Normalize on-the-fly to float32 [0, 1] (GPU only)
 ```
 Input: (12, 120, 128) - 4 RGB frames stacked
     ↓
-Stage 1: Conv3×3(12→64) → MaxPool3×3(s=2) → 2× ResBlock
+Stage 1: Conv3×3(12→32) → MaxPool3×3(s=2) → 2× ResBlock
     ↓
-Stage 2: Conv3×3(64→128) → MaxPool3×3(s=2) → 2× ResBlock
+Stage 2: Conv3×3(32→64) → MaxPool3×3(s=2) → 2× ResBlock
     ↓
-Stage 3: Conv3×3(128→128) → MaxPool3×3(s=2) → 2× ResBlock
+Stage 3: Conv3×3(64→64) → MaxPool3×3(s=2) → 2× ResBlock
     ↓
 Flatten → Linear(512) → ReLU
     ↓
@@ -139,7 +139,7 @@ Value head: Linear(256) → Linear(256) → 1 value
 **Why IMPALA over NatureCNN?**
 - Residual connections prevent gradient degradation
 - Better multi-task learning (can distinguish levels visually)
-- ~18M parameters (larger than NatureCNN for more capacity)
+- ~8M parameters (larger than NatureCNN for more capacity)
 
 ### Why RGB over Grayscale?
 
@@ -312,7 +312,7 @@ learning_rate = 2.5e-4  # With linear decay
 
 # Network
 cnn = "IMPALA"          # Residual CNN
-stage_depths = (64, 128, 128)
+stage_depths = (32, 64, 64)
 cnn_output_dim = 512
 policy_net = [256, 256]
 value_net = [256, 256]

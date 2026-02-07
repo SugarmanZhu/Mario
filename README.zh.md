@@ -92,7 +92,7 @@
 ## 特性
 
 - **多关卡训练**：同时在多个关卡上训练，防止灾难性遗忘
-- **IMPALA CNN架构**：约1800万参数的残差CNN，更好的多任务学习
+- **IMPALA CNN架构**：约800万参数的残差CNN，更好的多任务学习
 - **RGB观测**：128×120 RGB（非灰度）- 智能体可以看到HUD文字、道具颜色、关卡背景
 - **熵衰减**：自动从0.08衰减到0.01，实现探索到利用的过渡
 - **并行训练**：使用 `SubprocVecEnv` 实现真正的多进程并行
@@ -124,11 +124,11 @@ NES帧 (256×240 RGB)
 ```
 输入: (12, 120, 128) - 4帧RGB堆叠
     ↓
-阶段1: Conv3×3(12→64) → MaxPool3×3(s=2) → 2× ResBlock
+阶段1: Conv3×3(12→32) → MaxPool3×3(s=2) → 2× ResBlock
     ↓
-阶段2: Conv3×3(64→128) → MaxPool3×3(s=2) → 2× ResBlock
+阶段2: Conv3×3(32→64) → MaxPool3×3(s=2) → 2× ResBlock
     ↓
-阶段3: Conv3×3(128→128) → MaxPool3×3(s=2) → 2× ResBlock
+阶段3: Conv3×3(64→64) → MaxPool3×3(s=2) → 2× ResBlock
     ↓
 展平 → Linear(512) → ReLU
     ↓
@@ -139,7 +139,7 @@ NES帧 (256×240 RGB)
 **为什么选择IMPALA而不是NatureCNN？**
 - 残差连接防止梯度消失
 - 更好的多任务学习（可以通过视觉区分关卡）
-- 约1800万参数（比NatureCNN更大，提供更多容量）
+- 约800万参数（比NatureCNN更大，提供更多容量）
 
 ### 为什么选择RGB而不是灰度？
 
@@ -312,7 +312,7 @@ learning_rate = 2.5e-4  # 使用线性衰减
 
 # 网络
 cnn = "IMPALA"          # 残差CNN
-stage_depths = (64, 128, 128)
+stage_depths = (32, 64, 64)
 cnn_output_dim = 512
 policy_net = [256, 256]
 value_net = [256, 256]
