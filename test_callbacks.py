@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 """Quick test to verify callbacks are working."""
 
+import sys
+
 from callbacks import ProgressTrackingCallback, PolicyCollapseCallback
+
+failures = 0
 
 print("=" * 60)
 print("CALLBACK VERIFICATION TEST")
@@ -16,6 +20,7 @@ try:
     print(f"  - Has _on_step method: {hasattr(ptc, '_on_step')}")
 except Exception as e:
     print(f"[FAIL] FAILED to instantiate ProgressTrackingCallback: {e}")
+    failures += 1
 
 print()
 
@@ -36,8 +41,14 @@ try:
     print(f"  - Has _on_step method: {hasattr(pcc, '_on_step')}")
 except Exception as e:
     print(f"[FAIL] FAILED to instantiate PolicyCollapseCallback: {e}")
+    failures += 1
 
 print()
 print("=" * 60)
-print("[PASS] ALL CALLBACK TESTS PASSED")
-print("=" * 60)
+if failures:
+    print(f"[FAIL] {failures} CALLBACK TEST(S) FAILED")
+    print("=" * 60)
+    sys.exit(1)
+else:
+    print("[PASS] ALL CALLBACK TESTS PASSED")
+    print("=" * 60)
