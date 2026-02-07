@@ -168,13 +168,12 @@ class PolicyCollapseCallback(BaseCallback):
         """
         action_counts = {}
         n_envs = self.training_env.num_envs
-        obs_shape = self.training_env.observation_space.shape
 
-        # Generate random observations (normalized pixel values)
+        # Generate random observations and query policy
         # This tests if the policy has collapsed to always choosing one action
         for _ in range(self.n_eval_samples):
-            # Create random observations (batch of n_envs observations)
-            random_obs = np.random.randint(0, 256, size=(n_envs, *obs_shape), dtype=np.uint8)
+            # Create random observations matching the observation space dtype/range
+            random_obs = np.stack([self.training_env.observation_space.sample() for _ in range(n_envs)])
 
             # Get action from policy
             action, _ = self.model.predict(random_obs, deterministic=False)
