@@ -221,7 +221,7 @@ def train(
 
     # Policy collapse detection and auto-recovery callback
     collapse_callback = PolicyCollapseCallback(
-        check_freq=50_000,  # Check every 50k steps
+        check_freq=max(1, 2_400_000 // n_envs),  # Check every ~2.4M timesteps
         dominant_action_threshold=0.85,  # Trigger if any action > 85%
         entropy_threshold=0.3,  # Trigger if entropy < 0.3
         checkpoint_dir=checkpoint_dir,
@@ -232,7 +232,7 @@ def train(
 
     # Episode-level progress tracking callback
     progress_callback = ProgressTrackingCallback(
-        check_freq=10_000,  # Log every 10k steps
+        check_freq=max(1, 480_000 // n_envs),  # Log every ~480k timesteps
         verbose=1,
     )
 
