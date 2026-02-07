@@ -288,7 +288,7 @@ python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_m
 | `--lr` | `0.00025` | 学习率 |
 | `--ent-coef` | `0.08` | 初始熵系数（自动衰减到0.01） |
 | `--n-steps` | `4096` | 每个环境每次更新的步数 |
-| `--batch-size` | `1024` | PPO更新的小批量大小 |
+| `--batch-size` | `256` | PPO更新的小批量大小 |
 | `--slow` | `False` | 减慢播放速度便于观看 |
 
 ## PPO超参数
@@ -300,7 +300,7 @@ action_space = 12                    # COMPLEX_MOVEMENT
 
 # PPO
 n_steps = 4096          # 每个环境每次更新的步数
-batch_size = 1024       # 小批量大小
+batch_size = 256        # 小批量大小
 n_epochs = 10           # 每次更新的轮数
 gamma = 0.99            # 折扣因子
 gae_lambda = 0.95       # GAE lambda

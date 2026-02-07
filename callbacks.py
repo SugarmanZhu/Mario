@@ -7,6 +7,7 @@ import glob
 from collections import deque
 from typing import Optional
 
+import torch
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 
@@ -326,25 +327,9 @@ class ProgressTrackingCallback(BaseCallback):
         if self.current_episode_max_x is None:
             self._init_tracking()
 
-        # Track episode statistics from the environment
-        # We access the last dones and infos from the training environment's step
-        if hasattr(self.training_env, "buf_dones") and hasattr(
-            self.training_env, "buf_infos"
-        ):
-            dones = self.training_env.buf_dones
-            infos = self.training_env.buf_infos
-        else:
-            # Fallback: try to get from wrapped env
-            dones = getattr(
-                self.training_env,
-                "dones",
-                np.zeros(self.training_env.num_envs, dtype=bool),
-            )
-            infos = getattr(
-                self.training_env, "infos", [{}] * self.training_env.num_envs
-            )
-
-        # Get rewards from the rollout buffer or locals
+        # Get dones, infos, and rewards from self.locals (set by SB3 each step)
+        dones = self.locals.get("dones", np.zeros(self.training_env.num_envs, dtype=bool))
+        infos = self.locals.get("infos", [{}] * self.training_env.num_envs)
         rewards = self.locals.get("rewards", np.zeros(self.training_env.num_envs))
 
         # Update tracking for each environment
@@ -422,6 +407,10 @@ class ProgressTrackingCallback(BaseCallback):
                     print(f"  Flag Get Rate: {flag_get_rate * 100:.1f}%")
                     print(f"  Avg Episode Length: {episode_length_mean:.1f}")
                     print(f"  Avg Reward/Step: {reward_per_step_mean:.3f}")
+                    if torch.cuda.is_available():
+                        active = torch.cuda.memory_allocated() / 1e9
+                        reserved = torch.cuda.memory_reserved() / 1e9
+                        print(f"  VRAM: {active:.1f} GB active / {reserved:.1f} GB reserved")
 
             except Exception as e:
                 if self.verbose > 0:

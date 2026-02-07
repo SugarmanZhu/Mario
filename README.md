@@ -288,7 +288,7 @@ python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_m
 | `--lr` | `0.00025` | Learning rate |
 | `--ent-coef` | `0.08` | Initial entropy coefficient (decays to 0.01 automatically) |
 | `--n-steps` | `4096` | Steps per environment per update |
-| `--batch-size` | `1024` | Minibatch size for PPO updates |
+| `--batch-size` | `256` | Minibatch size for PPO updates |
 | `--slow` | `False` | Slow down playback for viewing |
 
 ## PPO Hyperparameters
@@ -300,7 +300,7 @@ action_space = 12                    # COMPLEX_MOVEMENT
 
 # PPO
 n_steps = 4096          # Steps per environment per update
-batch_size = 1024       # Minibatch size
+batch_size = 256        # Minibatch size
 n_epochs = 10           # Epochs per update
 gamma = 0.99            # Discount factor
 gae_lambda = 0.95       # GAE lambda
