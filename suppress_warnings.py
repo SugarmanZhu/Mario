@@ -2,19 +2,17 @@
 Suppress noisy gym/numpy deprecation warnings.
 Import this module before any gym imports.
 """
-import warnings
 import sys
+import warnings
 
 
 class _SuppressGymWarning:
     def __init__(self, stream):
-        self.stream = stream
-    
+        self._stream = stream
+
     def write(self, msg):
-        # Skip empty or whitespace-only messages
         if not msg or msg.isspace():
             return
-        # Skip known warning patterns
         suppress = [
             'Gym has been unmaintained',
             'bool8',
@@ -22,10 +20,13 @@ class _SuppressGymWarning:
             'UserWarning',
         ]
         if not any(s in msg for s in suppress):
-            self.stream.write(msg)
-    
+            self._stream.write(msg)
+
     def flush(self):
-        self.stream.flush()
+        self._stream.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
 
 
 sys.stderr = _SuppressGymWarning(sys.stderr)
