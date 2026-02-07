@@ -92,11 +92,11 @@ A reinforcement learning agent that learns to play Super Mario Bros using **Prox
 ## Features
 
 - **Multi-Level Training**: Train on multiple levels simultaneously without catastrophic forgetting
-- **IMPALA CNN Architecture**: Residual CNN with ~4M parameters for better multi-task learning
+- **IMPALA CNN Architecture**: Residual CNN with ~18M parameters for better multi-task learning
 - **RGB Observations**: 128×120 RGB (not grayscale) - agent can see HUD text, powerup colors, level backgrounds
 - **Entropy Decay**: Automatic decay from 0.08 → 0.01 for exploration-to-exploitation transition
 - **Parallel Training**: Uses `SubprocVecEnv` for true multi-process parallelism
-- **Memory Efficient**: uint8 observations with on-the-fly normalization (~11GB rollout buffer for 32 envs)
+- **Memory Efficient**: uint8 observations with on-the-fly normalization (~16GB rollout buffer for 48 envs)
 - **Automatic Checkpointing**: Saves model every 100K steps with resume support
 - **Best Model Tracking**: Automatically saves the best performing model
 - **TensorBoard Integration**: Real-time training visualization
@@ -124,11 +124,11 @@ Normalize on-the-fly to float32 [0, 1] (GPU only)
 ```
 Input: (12, 120, 128) - 4 RGB frames stacked
     ↓
-Stage 1: Conv3×3(12→16) → MaxPool3×3(s=2) → 2× ResBlock
+Stage 1: Conv3×3(12→64) → MaxPool3×3(s=2) → 2× ResBlock
     ↓
-Stage 2: Conv3×3(16→32) → MaxPool3×3(s=2) → 2× ResBlock
+Stage 2: Conv3×3(64→128) → MaxPool3×3(s=2) → 2× ResBlock
     ↓
-Stage 3: Conv3×3(32→32) → MaxPool3×3(s=2) → 2× ResBlock
+Stage 3: Conv3×3(128→128) → MaxPool3×3(s=2) → 2× ResBlock
     ↓
 Flatten → Linear(512) → ReLU
     ↓
@@ -139,7 +139,7 @@ Value head: Linear(256) → Linear(256) → 1 value
 **Why IMPALA over NatureCNN?**
 - Residual connections prevent gradient degradation
 - Better multi-task learning (can distinguish levels visually)
-- ~4M parameters (similar size to NatureCNN)
+- ~18M parameters (larger than NatureCNN for more capacity)
 
 ### Why RGB over Grayscale?
 
@@ -153,15 +153,15 @@ For multi-level training, RGB provides crucial visual context that helps the age
 
 ## Hardware Requirements
 
-| Component | Minimum | Recommended (32 envs) |
+| Component | Minimum | Recommended (48 envs) |
 |-----------|---------|----------------------|
-| GPU VRAM | 4GB | 4GB (model is small) |
+| GPU VRAM | 6GB | 8GB |
 | RAM | 32GB | 64GB |
 | CPU | 8 cores | 16+ cores |
 
-**Actual usage with 32 parallel environments:**
-- GPU: ~4GB VRAM, ~78% utilization
-- RAM: ~37GB stable, spikes to 64GB during updates
+**Actual usage with 48 parallel environments:**
+- GPU: ~5GB VRAM
+- RAM: ~50GB stable, spikes during updates
 - CPU: ~50% utilization
 
 ## Quick Start
@@ -186,10 +186,10 @@ pip install -r requirements.txt
 python test_env.py
 
 # Train agent (--env supports shorthand: '1-1' = 'SuperMarioBros-1-1-v0')
-python train_ppo.py --timesteps 20000000 --n-envs 32
+python train_ppo.py --timesteps 20000000 --n-envs 48
 
 # Multi-level training (recommended for generalization)
-python train_ppo.py --env "1-1,1-2" --timesteps 20000000 --n-envs 32
+python train_ppo.py --env "1-1,1-2" --timesteps 20000000 --n-envs 48
 
 # Watch trained agent play
 python train_ppo.py --mode play --model ./mario_models/1-1/best/best_model.zip --slow
@@ -237,10 +237,10 @@ Mario/
 Start a new training run:
 ```bash
 # Single level
-python train_ppo.py --env 1-1 --timesteps 10000000 --n-envs 16
+python train_ppo.py --env 1-1 --timesteps 10000000 --n-envs 48
 
 # Multi-level (recommended)
-python train_ppo.py --env "1-1,1-2" --timesteps 20000000 --n-envs 32
+python train_ppo.py --env "1-1,1-2" --timesteps 20000000 --n-envs 48
 ```
 
 Resume from a checkpoint:
@@ -282,13 +282,13 @@ python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_m
 | `--mode` | `train` | `train` or `play` |
 | `--env` | `1-1` | Environment ID(s), supports shorthand (e.g., `1-1`, `1-1,1-2`) |
 | `--timesteps` | `2000000` | Total training timesteps |
-| `--n-envs` | `16` | Number of parallel environments (32 recommended for 64GB RAM) |
+| `--n-envs` | `48` | Number of parallel environments |
 | `--model` | `None` | Model path for play mode |
 | `--resume` | `None` | Checkpoint path to resume training |
-| `--lr` | `0.0001` | Learning rate |
+| `--lr` | `0.00025` | Learning rate |
 | `--ent-coef` | `0.08` | Initial entropy coefficient (decays to 0.01 automatically) |
 | `--n-steps` | `4096` | Steps per environment per update |
-| `--batch-size` | `256` | Minibatch size for PPO updates |
+| `--batch-size` | `1024` | Minibatch size for PPO updates |
 | `--slow` | `False` | Slow down playback for viewing |
 
 ## PPO Hyperparameters
@@ -300,7 +300,7 @@ action_space = 12                    # COMPLEX_MOVEMENT
 
 # PPO
 n_steps = 4096          # Steps per environment per update
-batch_size = 256        # Minibatch size
+batch_size = 1024       # Minibatch size
 n_epochs = 10           # Epochs per update
 gamma = 0.99            # Discount factor
 gae_lambda = 0.95       # GAE lambda
@@ -308,11 +308,11 @@ clip_range = 0.2        # PPO clipping parameter
 ent_coef = 0.08 → 0.01  # Entropy coefficient (linear decay)
 vf_coef = 0.5           # Value function coefficient
 max_grad_norm = 0.5     # Gradient clipping
-learning_rate = 1e-4    # With linear decay
+learning_rate = 2.5e-4  # With linear decay
 
 # Network
 cnn = "IMPALA"          # Residual CNN
-stage_depths = (16, 32, 32)
+stage_depths = (64, 128, 128)
 cnn_output_dim = 512
 policy_net = [256, 256]
 value_net = [256, 256]
@@ -342,7 +342,7 @@ Expected behavior for multi-level training (1-1 + 1-2):
 | 7-12M | Can complete levels occasionally | 0.03 → 0.02 |
 | 12-20M | Consistent level completion, fine-tuning | 0.02 → 0.01 |
 
-**Training speed:** ~672 steps/sec with 32 envs on RTX 5090 (~8 hours for 20M steps)
+**Training speed:** ~672 steps/sec with 48 envs on RTX 5090 (~8 hours for 20M steps)
 
 ## Troubleshooting
 
@@ -356,7 +356,7 @@ The `PolicyCollapseCallback` automatically detects and recovers from collapse du
 
 ### Out of Memory (RAM)
 If training crashes or system becomes unresponsive:
-- Reduce `--n-envs` (16 uses ~20GB, 32 uses ~40GB)
+- Reduce `--n-envs` (16 uses ~20GB, 48 uses ~55GB)
 - Reduce `--n-steps` (2048 instead of 4096 halves buffer size)
 
 ### Training Freezes

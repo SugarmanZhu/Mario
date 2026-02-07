@@ -92,11 +92,11 @@
 ## 特性
 
 - **多关卡训练**：同时在多个关卡上训练，防止灾难性遗忘
-- **IMPALA CNN架构**：约400万参数的残差CNN，更好的多任务学习
+- **IMPALA CNN架构**：约1800万参数的残差CNN，更好的多任务学习
 - **RGB观测**：128×120 RGB（非灰度）- 智能体可以看到HUD文字、道具颜色、关卡背景
 - **熵衰减**：自动从0.08衰减到0.01，实现探索到利用的过渡
 - **并行训练**：使用 `SubprocVecEnv` 实现真正的多进程并行
-- **内存高效**：uint8观测配合即时归一化（32个环境约11GB滚动缓冲区）
+- **内存高效**：uint8观测配合即时归一化（48个环境约16GB滚动缓冲区）
 - **自动检查点**：每10万步保存模型，支持断点续训
 - **最佳模型追踪**：自动保存评估表现最好的模型
 - **TensorBoard集成**：实时训练可视化
@@ -124,11 +124,11 @@ NES帧 (256×240 RGB)
 ```
 输入: (12, 120, 128) - 4帧RGB堆叠
     ↓
-阶段1: Conv3×3(12→16) → MaxPool3×3(s=2) → 2× ResBlock
+阶段1: Conv3×3(12→64) → MaxPool3×3(s=2) → 2× ResBlock
     ↓
-阶段2: Conv3×3(16→32) → MaxPool3×3(s=2) → 2× ResBlock
+阶段2: Conv3×3(64→128) → MaxPool3×3(s=2) → 2× ResBlock
     ↓
-阶段3: Conv3×3(32→32) → MaxPool3×3(s=2) → 2× ResBlock
+阶段3: Conv3×3(128→128) → MaxPool3×3(s=2) → 2× ResBlock
     ↓
 展平 → Linear(512) → ReLU
     ↓
@@ -139,7 +139,7 @@ NES帧 (256×240 RGB)
 **为什么选择IMPALA而不是NatureCNN？**
 - 残差连接防止梯度消失
 - 更好的多任务学习（可以通过视觉区分关卡）
-- 约400万参数（与NatureCNN相近）
+- 约1800万参数（比NatureCNN更大，提供更多容量）
 
 ### 为什么选择RGB而不是灰度？
 
@@ -153,15 +153,15 @@ NES帧 (256×240 RGB)
 
 ## 硬件要求
 
-| 组件 | 最低 | 推荐 (32个环境) |
+| 组件 | 最低 | 推荐 (48个环境) |
 |------|------|----------------|
-| GPU显存 | 4GB | 4GB (模型很小) |
+| GPU显存 | 6GB | 8GB |
 | 内存 | 32GB | 64GB |
 | CPU | 8核 | 16+核 |
 
-**32个并行环境的实际使用情况：**
-- GPU: ~4GB显存，~78%利用率
-- 内存: 稳定~37GB，更新时峰值64GB
+**48个并行环境的实际使用情况：**
+- GPU: ~5GB显存
+- 内存: 稳定~50GB，更新时有峰值
 - CPU: ~50%利用率
 
 ## 快速开始
@@ -186,10 +186,10 @@ pip install -r requirements.txt
 python test_env.py
 
 # 训练智能体（--env 支持简写：'1-1' = 'SuperMarioBros-1-1-v0'）
-python train_ppo.py --timesteps 20000000 --n-envs 32
+python train_ppo.py --timesteps 20000000 --n-envs 48
 
 # 多关卡训练（推荐用于泛化）
-python train_ppo.py --env "1-1,1-2" --timesteps 20000000 --n-envs 32
+python train_ppo.py --env "1-1,1-2" --timesteps 20000000 --n-envs 48
 
 # 观看训练好的智能体游玩
 python train_ppo.py --mode play --model ./mario_models/1-1/best/best_model.zip --slow
@@ -237,10 +237,10 @@ Mario/
 开始新的训练：
 ```bash
 # 单关卡
-python train_ppo.py --env 1-1 --timesteps 10000000 --n-envs 16
+python train_ppo.py --env 1-1 --timesteps 10000000 --n-envs 48
 
 # 多关卡（推荐）
-python train_ppo.py --env "1-1,1-2" --timesteps 20000000 --n-envs 32
+python train_ppo.py --env "1-1,1-2" --timesteps 20000000 --n-envs 48
 ```
 
 从检查点恢复：
@@ -282,13 +282,13 @@ python train_ppo.py --mode play --model ./mario_models/multi-1-1-1-2/best/best_m
 | `--mode` | `train` | `train` 或 `play` |
 | `--env` | `1-1` | 环境ID，支持简写（如 `1-1`、`1-1,1-2`） |
 | `--timesteps` | `2000000` | 总训练步数 |
-| `--n-envs` | `16` | 并行环境数（64GB内存推荐32） |
+| `--n-envs` | `48` | 并行环境数 |
 | `--model` | `None` | 游玩模式的模型路径 |
 | `--resume` | `None` | 恢复训练的检查点路径 |
-| `--lr` | `0.0001` | 学习率 |
+| `--lr` | `0.00025` | 学习率 |
 | `--ent-coef` | `0.08` | 初始熵系数（自动衰减到0.01） |
 | `--n-steps` | `4096` | 每个环境每次更新的步数 |
-| `--batch-size` | `256` | PPO更新的小批量大小 |
+| `--batch-size` | `1024` | PPO更新的小批量大小 |
 | `--slow` | `False` | 减慢播放速度便于观看 |
 
 ## PPO超参数
@@ -300,7 +300,7 @@ action_space = 12                    # COMPLEX_MOVEMENT
 
 # PPO
 n_steps = 4096          # 每个环境每次更新的步数
-batch_size = 256        # 小批量大小
+batch_size = 1024       # 小批量大小
 n_epochs = 10           # 每次更新的轮数
 gamma = 0.99            # 折扣因子
 gae_lambda = 0.95       # GAE lambda
@@ -308,11 +308,11 @@ clip_range = 0.2        # PPO裁剪参数
 ent_coef = 0.08 → 0.01  # 熵系数（线性衰减）
 vf_coef = 0.5           # 价值函数系数
 max_grad_norm = 0.5     # 梯度裁剪
-learning_rate = 1e-4    # 使用线性衰减
+learning_rate = 2.5e-4  # 使用线性衰减
 
 # 网络
 cnn = "IMPALA"          # 残差CNN
-stage_depths = (16, 32, 32)
+stage_depths = (64, 128, 128)
 cnn_output_dim = 512
 policy_net = [256, 256]
 value_net = [256, 256]
@@ -342,7 +342,7 @@ value_net = [256, 256]
 | 700万-1200万 | 偶尔能通关 | 0.03 → 0.02 |
 | 1200万-2000万 | 稳定通关，精细调整 | 0.02 → 0.01 |
 
-**训练速度：** 在RTX 5090上使用32个环境约672步/秒（2000万步约8小时）
+**训练速度：** 在RTX 5090上使用48个环境约672步/秒（2000万步约8小时）
 
 ## 故障排除
 
@@ -356,7 +356,7 @@ value_net = [256, 256]
 
 ### 内存不足 (RAM)
 如果训练崩溃或系统无响应：
-- 减少 `--n-envs`（16个约20GB，32个约40GB）
+- 减少 `--n-envs`（16个约20GB，48个约55GB）
 - 减少 `--n-steps`（2048代替4096可将缓冲区大小减半）
 
 ### 训练卡住
