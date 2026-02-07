@@ -164,6 +164,7 @@ def train(
         )
         # Update hyperparameters for resumed training
         model.learning_rate = lr
+        model._setup_lr_schedule()  # Rebuild schedule so _update_learning_rate() uses the new LR
         model.ent_coef = (
             ent_coef  # Initial value, will be decayed by EntropyDecayCallback
         )
