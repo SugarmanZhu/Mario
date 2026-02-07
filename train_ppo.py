@@ -202,7 +202,7 @@ def train(
 
     # Setup callbacks
     checkpoint_callback = CheckpointCallback(
-        save_freq=checkpoint_freq // n_envs,  # Divide by n_envs for SubprocVecEnv
+        save_freq=max(1, checkpoint_freq // n_envs),  # Divide by n_envs for SubprocVecEnv
         save_path=checkpoint_dir,
         name_prefix="checkpoint",
         save_replay_buffer=False,
