@@ -160,8 +160,8 @@ For multi-level training, RGB provides crucial visual context that helps the age
 | CPU | 8 cores | 16+ cores |
 
 **Actual usage with 48 parallel environments:**
-- GPU: ~5GB VRAM
-- RAM: ~50GB stable, spikes during updates
+- GPU: ~20GB VRAM
+- RAM: ~45GB stable, spikes during updates
 - CPU: ~50% utilization
 
 ## Quick Start
