@@ -157,19 +157,25 @@ def train(
     lr = linear_schedule(learning_rate) if use_lr_schedule else learning_rate
 
     # Create or load PPO model
+    prior_timesteps = 0  # Track how many steps were done before this run
     if resume_from:
         print(f"\nLoading model from {resume_from}...")
         model = PPO.load(
             resume_from, env=train_env, tensorboard_log=run_log_dir, device="auto"
         )
-        # Update hyperparameters for resumed training
+        prior_timesteps = model.num_timesteps
+
+        # Keep the LR schedule but DON'T reset it — SB3's .learn() will compute
+        # progress_remaining correctly for the new run's budget.  We just need to
+        # make sure we're using the same schedule type.
         model.learning_rate = lr
-        model._setup_lr_schedule()  # Rebuild schedule so _update_learning_rate() uses the new LR
-        model.ent_coef = (
-            ent_coef  # Initial value, will be decayed by EntropyDecayCallback
-        )
-        print(f"Resumed! Previous timesteps: {model.num_timesteps:,}")
-        print(f"Entropy coefficient: {model.ent_coef} (will decay to 0.01)")
+        model._setup_lr_schedule()
+
+        # DON'T reset ent_coef here — the EntropyDecayCallback will set it on the
+        # very first step using prior_timesteps so the decay curve continues
+        # seamlessly from where the previous run left off.
+        print(f"Resumed! Previous timesteps: {prior_timesteps:,}")
+        print(f"Entropy coefficient will continue decay from prior progress")
     else:
         print("\nCreating new PPO model...")
         # Get policy kwargs - always use IMPALA CNN
@@ -238,10 +244,13 @@ def train(
     )
 
     # Entropy coefficient decay callback (0.08 -> 0.01 over training)
+    # When resuming, prior_timesteps offsets the decay curve so entropy
+    # continues from where the previous run left off instead of resetting.
     entropy_decay_callback = EntropyDecayCallback(
         initial_ent_coef=ent_coef,
         final_ent_coef=0.01,
         total_timesteps=total_timesteps,
+        prior_timesteps=prior_timesteps,
         verbose=1,
     )
 
