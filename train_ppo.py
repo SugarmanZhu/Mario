@@ -153,9 +153,6 @@ def train(
     if is_multi_env:
         print(f"  Evaluating on {len(unique_env_ids)} unique levels: {unique_env_ids}")
 
-    # Setup learning rate
-    lr = linear_schedule(learning_rate) if use_lr_schedule else learning_rate
-
     # Create or load PPO model
     prior_timesteps = 0  # Track how many steps were done before this run
     if resume_from:
@@ -165,9 +162,10 @@ def train(
         )
         prior_timesteps = model.num_timesteps
 
-        # Keep the LR schedule but DON'T reset it — SB3's .learn() will compute
-        # progress_remaining correctly for the new run's budget.  We just need to
-        # make sure we're using the same schedule type.
+        # Rebuild the LR schedule with prior_timesteps so the decay curve
+        # continues from where the previous run left off instead of jumping
+        # back to the initial LR value.
+        lr = linear_schedule(learning_rate, prior_timesteps, total_timesteps) if use_lr_schedule else learning_rate
         model.learning_rate = lr
         model._setup_lr_schedule()
 
@@ -175,9 +173,10 @@ def train(
         # very first step using prior_timesteps so the decay curve continues
         # seamlessly from where the previous run left off.
         print(f"Resumed! Previous timesteps: {prior_timesteps:,}")
-        print(f"Entropy coefficient will continue decay from prior progress")
+        print(f"LR and entropy coefficient will continue decay from prior progress")
     else:
         print("\nCreating new PPO model...")
+        lr = linear_schedule(learning_rate) if use_lr_schedule else learning_rate
         # Get policy kwargs - always use IMPALA CNN
         policy_kwargs = get_policy_kwargs()
         # Observations are uint8 [0-255], let SB3 normalize to float32 [0-1] on-the-fly
