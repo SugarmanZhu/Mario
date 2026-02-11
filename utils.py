@@ -59,13 +59,35 @@ def compute_policy_health(action_counts: dict, n_actions: int) -> dict:
     }
 
 
-def linear_schedule(initial_value: float):
+def linear_schedule(initial_value: float, prior_timesteps: int = 0, total_timesteps: int = 0):
     """
     Linear learning rate schedule.
     Returns a function that computes current learning rate based on remaining progress.
+
+    When resuming training, pass ``prior_timesteps`` and ``total_timesteps`` so the
+    decay curve continues from where the previous run left off instead of resetting
+    the LR to its initial value.
+
+    Args:
+        initial_value: Starting learning rate.
+        prior_timesteps: Timesteps already completed in previous runs.
+        total_timesteps: Total timesteps for the full decay (initial_value -> 0).
+            Only used when prior_timesteps > 0.
     """
 
     def func(progress_remaining: float) -> float:
+        if prior_timesteps > 0 and total_timesteps > 0:
+            # SB3 passes progress_remaining for the *current* .learn() budget only.
+            # Convert to cumulative progress across all runs:
+            #   new_budget = total_timesteps - prior_timesteps  (approx)
+            #   steps_this_run = (1 - progress_remaining) * new_budget
+            #   cumulative = prior_timesteps + steps_this_run
+            #   overall_remaining = 1 - cumulative / total_timesteps
+            new_budget = total_timesteps - prior_timesteps
+            steps_this_run = (1.0 - progress_remaining) * new_budget
+            cumulative = prior_timesteps + steps_this_run
+            overall_remaining = max(0.0, 1.0 - cumulative / total_timesteps)
+            return overall_remaining * initial_value
         return progress_remaining * initial_value
 
     return func
