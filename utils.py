@@ -71,8 +71,8 @@ def linear_schedule(initial_value: float, prior_timesteps: int = 0, total_timest
     Args:
         initial_value: Starting learning rate.
         prior_timesteps: Timesteps already completed in previous runs.
-        total_timesteps: Total timesteps for the full decay (initial_value -> 0).
-            Only used when prior_timesteps > 0.
+        total_timesteps: Lifetime total timesteps (prior + new budget) for the
+            full decay (initial_value -> 0). Only used when prior_timesteps > 0.
     """
 
     def func(progress_remaining: float) -> float:

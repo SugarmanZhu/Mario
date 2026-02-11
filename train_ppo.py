@@ -165,7 +165,7 @@ def train(
         # Rebuild the LR schedule with prior_timesteps so the decay curve
         # continues from where the previous run left off instead of jumping
         # back to the initial LR value.
-        lr = linear_schedule(learning_rate, prior_timesteps, total_timesteps) if use_lr_schedule else learning_rate
+        lr = linear_schedule(learning_rate, prior_timesteps, prior_timesteps + total_timesteps) if use_lr_schedule else learning_rate
         model.learning_rate = lr
         model._setup_lr_schedule()
 
@@ -248,7 +248,7 @@ def train(
     entropy_decay_callback = EntropyDecayCallback(
         initial_ent_coef=ent_coef,
         final_ent_coef=0.01,
-        total_timesteps=total_timesteps,
+        total_timesteps=prior_timesteps + total_timesteps,
         prior_timesteps=prior_timesteps,
         verbose=1,
     )
